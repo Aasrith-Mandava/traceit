@@ -33,14 +33,14 @@ describe('seedDemo', () => {
     first = await seed.seedDemo({ now: new Date('2026-09-26T18:00:00Z') });
     expect(first.status).toBe('seeded');
     const [s1, s2] = first.sessions;
-    expect(s1.title).toBe('Maya — Session 1');
+    expect(s1.title).toBe('Maya · Session 1');
     expect(s1.moments.map((m) => [m.type, m.status])).toEqual([
       ['breakthrough', 'resolved'],
       ['misconception_corrected', 'resolved'],
       ['unresolved_gap', 'resolved'],
     ]);
     expect(s1.moments[1].lectureMs).toBe(DEMO_TIMES.correctionEraseMs);
-    expect(s2).toMatchObject({ title: 'Maya — Session 2', moments: [] });
+    expect(s2).toMatchObject({ title: 'Maya · Session 2', moments: [] });
 
     const gap = (await db.getAnalysis(DEMO_SESSIONS.s1.id))!.events.find((e) => e.type === 'unresolved_gap')!;
     expect(gap).toMatchObject({ resolvedBy: 'revisit', resolvedInSessionId: DEMO_SESSIONS.s2.id, conceptLabel: 'Chain versus product rule' });

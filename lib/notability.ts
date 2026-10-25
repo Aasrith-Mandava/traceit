@@ -14,7 +14,7 @@ export const DEFAULT_PDF_NAME = 'Notability export.pdf';
 
 /** Name + declared type + size check. Returns the (only) allowed extension. */
 export function checkPdfFile(file: { name: string; type: string; size: number }): Result<'.pdf'> {
-  if (extensionOf(file.name) !== '.pdf') return { ok: false, error: 'Choose a PDF — export it from Notability as PDF.' };
+  if (extensionOf(file.name) !== '.pdf') return { ok: false, error: 'Choose a PDF. Export it from Notability as PDF.' };
   const declared = file.type.toLowerCase().split(';')[0].trim();
   if (declared !== PDF_MIME) return { ok: false, error: `That file's type (${declared || 'unknown'}) isn't PDF.` };
   if (!Number.isFinite(file.size) || file.size <= 0) return { ok: false, error: 'The PDF is empty.' };
@@ -98,7 +98,7 @@ export function describePdfError(err: unknown): { kind: PdfErrorKind; message: s
     case 'InvalidPDFException':
       return {
         kind: 'invalid',
-        message: 'This PDF couldn’t be read — it may be damaged or incomplete. Try exporting it from Notability again.',
+        message: 'This PDF couldn’t be read. It may be damaged or incomplete. Try exporting it from Notability again.',
       };
     case 'ResponseException':
       return { kind: 'missing', message: 'Couldn’t load the PDF from TraceIt. Reload the page to try again.' };

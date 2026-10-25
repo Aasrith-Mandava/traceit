@@ -19,7 +19,7 @@ const SERIES = [
 const M = { top: 28, right: 28, bottom: 34, left: 44 };
 const PLOT_H = 200;
 
-const fmt = (v: number | null) => (v === null ? "—" : v.toFixed(2));
+const fmt = (v: number | null) => (v === null ? "n/a" : v.toFixed(2));
 
 function Mark({ shape, x, y, color }: { shape: "circle" | "square"; x: number; y: number; color: string }) {
   return shape === "circle" ? (

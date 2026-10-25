@@ -125,8 +125,8 @@ export default function ProcessView({ sessionId, strokes, events, revisions, vis
                   data-testid="process-marker"
                   data-event-id={event.id}
                   data-type={event.type}
-                  aria-label={`${momentAriaLabel(event)} — open in study mode`}
-                  title={`${MOMENT_META[event.type].label} — open in study mode`}
+                  aria-label={`${momentAriaLabel(event)}: open in study mode`}
+                  title={`${MOMENT_META[event.type].label}: open in study mode`}
                   tabIndex={hidden ? -1 : undefined}
                   className="group absolute inline-flex size-11 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-pill"
                 >

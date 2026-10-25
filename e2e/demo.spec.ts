@@ -49,14 +49,14 @@ test("the two-minute demo runs end to end, offline, with no errors", async ({ pa
   await page.goto("/app");
   const rows = page.getByTestId("session-link");
   await expect(rows).toHaveCount(2);
-  await expect(rows.nth(0)).toContainText("Maya — Session 2");
-  await expect(rows.nth(1)).toContainText("Maya — Session 1");
+  await expect(rows.nth(0)).toContainText("Maya · Session 2");
+  await expect(rows.nth(1)).toContainText("Maya · Session 1");
   await expect(page.locator(`a[href="/session/${S1}"] [data-testid="session-stroke-count"]`)).toContainText(/\d+ pen strokes/);
   await expect(page.getByTestId("open-gaps-count")).toHaveText("0");
   await shot(page, "demo-01-home");
 
   // 2. Session 1 review: a breakthrough already earned, the correction, the gap.
-  await page.getByRole("link", { name: "Review Maya — Session 1" }).click();
+  await page.getByRole("link", { name: "Review Maya · Session 1" }).click();
   await page.waitForURL(new RegExp(`/review/${S1}$`));
   await expect(page.getByTestId("timeline")).toHaveAttribute("data-status", "ready");
   await expect(page.getByTestId("count-breakthroughs")).toHaveText("1");
@@ -185,7 +185,7 @@ test("the health check and home page answer on the demo server", async ({ reques
   expect(await health.json()).toMatchObject({ ok: true });
   const home = await request.get("/app");
   expect(home.status()).toBe(200);
-  expect(await home.text()).toContain("Maya — Session 1");
+  expect(await home.text()).toContain("Maya · Session 1");
 });
 
 // The demo server runs without PUBLIC_UPLOADS: adding a lecture stays off, in the UI and the API.
@@ -215,7 +215,7 @@ test.describe("signed out", () => {
     await expect(page.getByTestId("user-menu")).toContainText("Maya");
     const rows = page.getByTestId("session-link");
     await expect(rows).toHaveCount(2);
-    await expect(rows.nth(1)).toContainText("Maya — Session 1");
+    await expect(rows.nth(1)).toContainText("Maya · Session 1");
     // Creating an account is for self-hosted copies.
     const signup = await page.request.post("/api/auth/signup", {
       headers: { origin: DEMO_BASE },

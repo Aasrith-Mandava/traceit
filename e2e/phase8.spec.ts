@@ -131,7 +131,7 @@ test("a straight line through a word, then new writing nearby, erases the word (
   await drawWord(page, box, 385, 500, 300);
   const toast = page.getByTestId("scribble-toast");
   await expect(toast).toHaveAttribute("data-kind", "strike");
-  await expect(toast).toContainText("Struck through — kept as ghost");
+  await expect(toast).toContainText("Struck through, kept as ghost");
   await expect(canvas(page)).toHaveAttribute("data-erased-part-count", "1");
   await expect(canvas(page)).toHaveAttribute("data-drawn-count", "5");
   await expect(page.getByTestId("stroke-counter")).toHaveText("5 pen strokes · 1 ghost");

@@ -310,6 +310,6 @@ describe('history text', () => {
     ).toBe('First seen 09-25 · resolved 09-26 by writing through it calmly');
     expect(
       historyLine(gap('s1', 1, { status: 'resolved', resolvedBy: 'self', resolvedAtIso: '2026-09-26T10:00:00Z', history: h }), fmt),
-    ).toBe('First seen 09-25 · resolved 09-26 — you said you get it');
+    ).toBe('First seen 09-25 · resolved 09-26 when you said you get it');
   });
 });

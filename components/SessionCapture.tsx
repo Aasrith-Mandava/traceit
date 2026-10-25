@@ -46,7 +46,7 @@ const STATUS_LABEL: Record<SaveStatus, string> = {
   saved: "Saved",
   unsaved: "Unsaved changes",
   saving: "Saving…",
-  retrying: "Save failed — retrying",
+  retrying: "Save failed, retrying",
   rejected: "Some ink couldn’t be saved",
 };
 
@@ -359,7 +359,7 @@ export default function SessionCapture({
       liveResult = await liveFinishRef.current;
       if (!(await live.flushCues())) {
         setEnding("idle");
-        setEndError("Couldn’t save the live transcript — check your connection. Your notes are still here.");
+        setEndError("Couldn’t save the live transcript. Check your connection. Your notes are still here.");
         return;
       }
     }
@@ -375,7 +375,7 @@ export default function SessionCapture({
       setEndError(
         outcome === "rejected"
           ? "Some ink couldn’t be saved, so the session is still open. Your notes are still here."
-          : "Couldn’t save your notes — check your connection. Your notes are still here.",
+          : "Couldn’t save your notes. Check your connection. Your notes are still here.",
       );
       return;
     }
@@ -610,7 +610,7 @@ export default function SessionCapture({
                 className="enter-soft pointer-events-auto flex items-center gap-3 rounded-pill bg-night py-1 pr-1 pl-4 text-sm font-semibold text-white shadow-lift"
               >
                 <span aria-hidden="true" className="inline-block w-4 border-t-2 border-dashed border-accent-light" />
-                <span>{scribbleToast.by === "strike" ? "Struck through" : "Scribbled out"} — kept as ghost</span>
+                <span>{scribbleToast.by === "strike" ? "Struck through" : "Scribbled out"}, kept as ghost</span>
                 <button
                   type="button"
                   data-testid="scribble-undo"
@@ -642,7 +642,7 @@ export default function SessionCapture({
                 data-testid="capture-empty-hint"
                 className="pointer-events-none absolute top-3 left-10 max-w-[min(30rem,calc(100%-3.5rem))] -rotate-1 font-hand text-[23px] leading-[1.15] text-ink opacity-35 select-none sm:left-12 sm:text-[26px]"
               >
-                messy = progress — scribble boldly. Every crossed-out line stays as a faint ghost.
+                messy = progress. Scribble boldly. Every crossed-out line stays as a faint ghost.
               </p>
             ) : null}
           </InkCanvas>

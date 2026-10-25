@@ -63,7 +63,7 @@ export function LiveLectureBar({ live, title, available, actions, aside }: BarPr
     note = LIVE_DEMO_MESSAGE;
   } else if (mic === "blocked") {
     noteTone = "text-red-300";
-    note = "Microphone blocked — allow it from the address bar to transcribe. Your notes are still timed from Start.";
+    note = "Microphone blocked. Allow it from the address bar to transcribe. Your notes are still timed from Start.";
   } else if (mic === "unavailable" || (support && !support.mic)) {
     note = support?.secure === false
       ? "The microphone needs HTTPS or localhost, so there’s no live transcript here. You can still take notes, timed from Start."
@@ -113,7 +113,7 @@ export function LiveLectureBar({ live, title, available, actions, aside }: BarPr
           data-testid="mic-pill"
           data-state={listening ? "listening" : status}
           role="status"
-          aria-label={listening ? "Microphone on — listening" : pill.label}
+          aria-label={listening ? "Microphone on, listening" : pill.label}
           className={`inline-flex min-h-8 shrink-0 items-center gap-2 rounded-pill border px-3 text-xs font-bold tracking-wide uppercase ${pill.tone}`}
         >
           <span aria-hidden="true" className={`size-2 rounded-pill ${pill.dot}`} />

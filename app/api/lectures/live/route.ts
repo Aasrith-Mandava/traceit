@@ -33,7 +33,7 @@ export const POST = sameOriginOnly(withUser(async (request, user) => {
     if (!cls) return Response.json({ error: "unknown class" }, { status: 400 });
     classId = cls.id;
   }
-  const title = sanitizeTitle(rawTitle, `Live lecture — ${new Date().toLocaleDateString("en-US")}`);
+  const title = sanitizeTitle(rawTitle, `Live lecture · ${new Date().toLocaleDateString("en-US")}`);
   const db = getDb();
   const lecture = await db.createLecture({
     ownerId: user.id,

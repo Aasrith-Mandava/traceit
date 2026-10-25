@@ -149,7 +149,7 @@ export function createAiService(deps: AiServiceDeps = {}) {
     return {
       ok: false,
       status: 429,
-      error: "Too many AI requests for this session — try again in a few minutes.",
+      error: "Too many AI requests for this session. Try again in a few minutes.",
       retryAfterMs: rate.retryAfterMs(key),
     };
   }

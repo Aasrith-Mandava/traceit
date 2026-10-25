@@ -53,7 +53,7 @@ const SOURCE_LABEL: Record<PublicHelpCard["source"], string> = {
 function NoKeyCard() {
   return (
     <div data-testid="help-nokey" className="rounded-[16px] border-[1.5px] border-dashed border-line-strong px-4 py-3.5 text-sm text-pretty text-ink-muted">
-      AI explanations need an API key — add <code className="font-mono text-xs text-ink">OPENAI_API_KEY</code> to{" "}
+      AI explanations need an API key. Add <code className="font-mono text-xs text-ink">OPENAI_API_KEY</code> to{" "}
       <code className="font-mono text-xs text-ink">.env.local</code>
     </div>
   );
@@ -255,7 +255,7 @@ export default function HelpPanel({
         setChoice(null);
       }
     } catch {
-      setSubmitError("Couldn’t save your answer — try again.");
+      setSubmitError("Couldn’t save your answer. Try again.");
     } finally {
       setPending(false);
     }
@@ -307,8 +307,8 @@ export default function HelpPanel({
       {state.kind === "ready" && state.fallback && !translating ? (
         <p data-testid="help-language-note" className="-mt-1 text-xs text-pretty text-ink-subtle">
           {ai.mode === "demo"
-            ? `${languageInfo(state.requested).native} isn’t available offline in this demo — showing English.`
-            : `Couldn’t translate this one right now — showing English.`}
+            ? `${languageInfo(state.requested).native} isn’t available offline in this demo. Showing English.`
+            : `Couldn’t translate this one right now. Showing English.`}
         </p>
       ) : null}
 
@@ -410,7 +410,7 @@ export default function HelpPanel({
               >
                 <p className="flex items-center gap-2 text-base font-bold text-ok-strong">
                   {breakthrough ? <MomentGlyph type="breakthrough" size={14} /> : <CheckIcon size={16} strokeWidth={2.5} />}
-                  {breakthrough ? "Aha moment!" : event.type === "unresolved_gap" ? "Got it — that’s cleared up" : "Nailed it!"}
+                  {breakthrough ? "Aha moment!" : event.type === "unresolved_gap" ? "Got it, that’s cleared up" : "Nailed it!"}
                 </p>
                 <p className="text-sm text-pretty text-ink-muted">
                   {feedback?.result === "correct" ? feedback.why : "You already got this one right."}
@@ -422,7 +422,7 @@ export default function HelpPanel({
                 data-result="wrong"
                 className="enter-soft flex flex-col gap-1 rounded-[12px] border border-gap/30 bg-gap-soft/70 px-3.5 py-3"
               >
-                <p className="text-sm font-bold text-gap-strong">Not quite — this one stays fuzzy for now.</p>
+                <p className="text-sm font-bold text-gap-strong">Not quite. This one stays fuzzy for now.</p>
                 <p data-testid="check-why" className="text-sm text-pretty text-ink-muted">
                   {feedback.why}
                 </p>

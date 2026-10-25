@@ -242,7 +242,7 @@ export function ordinal(n: number): string {
 
 export const RESOLVED_HOW: Record<ResolvedBy, string> = {
   revisit: 'by writing through it calmly',
-  self: '— you said you get it',
+  self: 'when you said you get it',
   check: 'with a check question',
 };
 

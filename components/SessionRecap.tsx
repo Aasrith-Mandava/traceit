@@ -132,7 +132,7 @@ export default function SessionRecap({ sessionId, serverVoice, version }: { sess
           </p>
           {recap.languageFallback ? (
             <p data-testid="recap-language-note" className="text-xs text-ink-subtle">
-              {languageInfo(language).native} isn’t available for the summary right now — it’s in English.
+              {languageInfo(language).native} isn’t available for the summary right now, so it’s in English.
             </p>
           ) : null}
         </div>

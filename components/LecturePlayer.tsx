@@ -106,7 +106,7 @@ export default function LecturePlayer({ title, durationMs, mediaRef, actions, as
           >
             <span>
               Press <span aria-hidden="true">▶</span>
-              <span className="sr-only"> play</span> — your notes are timed to the lecture.
+              <span className="sr-only"> play</span> to start. Your notes are timed to the lecture.
             </span>
           </p>
         ) : null}

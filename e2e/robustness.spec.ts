@@ -55,7 +55,7 @@ test.describe("autosave", () => {
     });
     await drawLine(page);
     const status = page.getByTestId("save-status");
-    await expect(status).toHaveText("Save failed — retrying", { timeout: 10_000 });
+    await expect(status).toHaveText("Save failed, retrying", { timeout: 10_000 });
     await expect(status).toHaveAttribute("data-status", "retrying");
     await expect(status).toHaveText("Saved", { timeout: 15_000 });
     expect(calls).toBeGreaterThanOrEqual(2);

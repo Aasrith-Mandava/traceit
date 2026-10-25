@@ -764,7 +764,7 @@ export class PostgresDb implements Db {
       studentId: input.studentId ?? LOCAL_STUDENT_ID,
       lectureId: input.lectureId,
       courseId: input.courseId,
-      title: input.title?.trim() || `Notes — ${new Date().toLocaleString("en-US")}`,
+      title: input.title?.trim() || `Notes · ${new Date().toLocaleString("en-US")}`,
       createdAtIso: new Date(createdMs).toISOString(),
       inputKind: null,
       hasPressure: false,

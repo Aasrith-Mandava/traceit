@@ -392,7 +392,7 @@ test.describe("(f) without an AI key", () => {
     await page.goto(`/review/${sessionId}`);
     await openMoment(page, corrected.id);
     const nokey = page.getByTestId("help-nokey");
-    await expect(nokey).toHaveText("AI explanations need an API key — add OPENAI_API_KEY to .env.local");
+    await expect(nokey).toHaveText("AI explanations need an API key. Add OPENAI_API_KEY to .env.local");
     await expect(page.getByTestId("help-card")).toHaveCount(0);
     await expect(page.getByTestId("revision-reading")).toHaveCount(0);
     // The rest of the panel works.

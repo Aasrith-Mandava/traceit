@@ -369,7 +369,7 @@ export default function ReviewView({
         ) : null}
         {/* Says so to screen readers too (focus goes back to the trail when the panel closes). */}
         <p role="status" className="sr-only">
-          {caughtUp ? "All caught up — you’ve looked at every moment." : ""}
+          {caughtUp ? "All caught up. You’ve looked at every moment." : ""}
         </p>
 
         <CarriedOver threads={carried} sessionId={session.id} />

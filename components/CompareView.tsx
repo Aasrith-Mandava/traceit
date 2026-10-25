@@ -250,7 +250,7 @@ function OverlayStage({
           reveal > 3 ? "opacity-100" : "opacity-0"
         }`}
       >
-        ← TraceIt — the process
+        ← TraceIt: the process
       </span>
       <span
         aria-hidden="true"
@@ -258,7 +258,7 @@ function OverlayStage({
           reveal < 97 ? "opacity-100" : "opacity-0"
         }`}
       >
-        Notability — final page →
+        Notability: final page →
       </span>
 
       <div
@@ -398,7 +398,7 @@ export default function CompareView({ session, strokes, initialTimeline, initial
         </div>
         {status === "error" ? (
           <p role="alert" className="text-sm text-danger">
-            Couldn’t read this session — open study mode to try again.
+            Couldn’t read this session. Open study mode to try again.
           </p>
         ) : null}
       </section>
@@ -414,7 +414,7 @@ export default function CompareView({ session, strokes, initialTimeline, initial
           <div data-testid="compare-side" className="grid flex-1 grid-cols-1 gap-4 md:grid-cols-2 md:grid-rows-1">
             <Panel
               labelId="final-heading"
-              title="Notability — final page"
+              title="Notability: final page"
               note={current ? current.fileName : "Only what survived to the end"}
               actions={pdf.status === "ready" ? pageNav : null}
             >
@@ -422,7 +422,7 @@ export default function CompareView({ session, strokes, initialTimeline, initial
             </Panel>
             <Panel
               labelId="process-heading"
-              title="TraceIt — the process"
+              title="TraceIt: the process"
               note={
                 <span className="inline-flex items-center gap-1.5">
                   <span aria-hidden="true" className="inline-block w-3 border-t-2 border-dashed border-ghost" />

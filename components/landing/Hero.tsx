@@ -249,7 +249,7 @@ export function Hero() {
         </motion.h1>
 
         <motion.p className="max-w-[560px] text-[18px] leading-[1.55] text-ink-muted sm:text-[20px]" {...rise(0.25)}>
-          TraceIt quietly watches how you write during a lecture — the pauses, the scratch-outs, the do-overs — and
+          TraceIt quietly watches how you write during a lecture (the pauses, the scratch-outs, the do-overs) and
           turns them into a trail of what you fixed, what still feels fuzzy, and the exact second of lecture behind
           each one.
         </motion.p>

@@ -77,7 +77,7 @@ export default function RevisionReading({
         </p>
         {vision.cosmetic ? (
           <p className="text-[13px] text-ink-subtle">
-            Looks like a tidy-up, not a slip — it’ll drop off your learning trail next time this session is analyzed.
+            Looks like a tidy-up, not a slip. It’ll drop off your learning trail next time this session is analyzed.
           </p>
         ) : vision.misconception ? (
           <p data-testid="revision-misconception" className="rounded-[12px] bg-chrome-hover px-3.5 py-3 text-ink-muted">

@@ -31,11 +31,11 @@ export function useNotabilityUpload(sessionId: string, onUploaded: (imported: No
       body.append("file", file);
       const res = await fetch(`/api/sessions/${encodeURIComponent(sessionId)}/notability`, { method: "POST", body });
       const json = (await res.json().catch(() => ({}))) as { import?: NotabilityImport; error?: string };
-      if (!res.ok || !json.import) throw new Error(json.error || "Upload failed — try again.");
+      if (!res.ok || !json.import) throw new Error(json.error || "Upload failed. Try again.");
       setState({ status: "idle" });
       onUploaded(json.import);
     } catch (err) {
-      setState({ status: "error", error: err instanceof Error ? err.message : "Upload failed — try again." });
+      setState({ status: "error", error: err instanceof Error ? err.message : "Upload failed. Try again." });
     }
   };
 

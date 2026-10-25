@@ -29,7 +29,7 @@ import { btnPrimary, btnSecondary } from "./ui";
 const HEADLINE: Record<TimelineEventType, string> = {
   misconception_corrected: "You caught your own mistake",
   unresolved_gap: "This part is still fuzzy",
-  breakthrough: "Aha — this one clicked",
+  breakthrough: "Aha, this one clicked",
 };
 // Literal class names per type so Tailwind generates them.
 const TILE_CLASS: Record<TimelineEventType, string> = {
@@ -285,7 +285,7 @@ function GapProgress({ event, onSelfAction }: { event: TimelineEvent; onSelfActi
     try {
       await onSelfAction(action);
     } catch {
-      setError("Couldn’t save that — try again.");
+      setError("Couldn’t save that. Try again.");
     } finally {
       setPending(null);
     }
@@ -325,7 +325,7 @@ function GapProgress({ event, onSelfAction }: { event: TimelineEvent; onSelfActi
             </button>
           )}
           <span className="text-[13px] text-pretty text-ink-subtle">
-            {open ? "Or just write through it calmly next time — it’ll clear up on its own." : "Feels shaky again? Reopen it."}
+            {open ? "Or just write through it calmly next time. It’ll clear up on its own." : "Feels shaky again? Reopen it."}
           </span>
         </div>
       ) : null}

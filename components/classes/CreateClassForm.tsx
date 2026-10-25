@@ -46,7 +46,7 @@ export default function CreateClassForm({ available, disabledNote }: { available
             required
             maxLength={80}
             autoComplete="off"
-            placeholder="e.g. Calculus I — Period 3"
+            placeholder="e.g. Calculus I: Period 3"
             value={name}
             onChange={(e) => setName(e.target.value)}
             className={`${inputClass} sm:flex-1`}

@@ -53,7 +53,7 @@ export default async function EvaluationPage() {
               data-testid="evaluation-caveat"
               className="max-w-2xl rounded-[16px] border border-gap/30 bg-gap-soft px-4 py-3 text-sm text-pretty text-gap-strong"
             >
-              <strong className="font-bold">Small labeled demo set</strong> — {report.sessionCount} sessions,{" "}
+              <strong className="font-bold">Small labeled demo set</strong>: {report.sessionCount} sessions,{" "}
               {report.labelCount} labels. A sanity check that the pipeline does what it claims, not a benchmark.
             </p>
           </PageHeader>
@@ -102,7 +102,7 @@ export default async function EvaluationPage() {
               Ink:{" "}
               {stored
                 ? "the seeded sessions as stored in the database."
-                : "rebuilt from lib/demoScenario — the same ink `npm run seed:demo` stores (the demo isn't seeded here)."}{" "}
+                : "rebuilt from lib/demoScenario, the same ink `npm run seed:demo` stores (the demo isn't seeded here)."}{" "}
               Labels: public/demo/ground-truth.json · also served as JSON at{" "}
               <a href="/api/evaluation" className="font-mono font-medium text-accent underline-offset-2 hover:underline">
                 /api/evaluation

@@ -54,7 +54,7 @@ export default function HesitationMeter({
 
   const { state, level, reasons } = useMemo(() => liveHesitation({ strokes, words, nowMs }), [strokes, words, nowMs]);
   const lit = state === "calibrating" ? 0 : Math.max(1, Math.ceil(level * BARS));
-  const detail = reasons.length ? reasons.join("; ") : state === "calibrating" ? "Keep writing — it compares you with your own pace." : "Writing at your usual pace.";
+  const detail = reasons.length ? reasons.join("; ") : state === "calibrating" ? "Keep writing. It compares you with your own pace." : "Writing at your usual pace.";
 
   return (
     <div
@@ -66,7 +66,7 @@ export default function HesitationMeter({
       aria-valuemin={0}
       aria-valuemax={100}
       aria-valuenow={Math.round(level * 100)}
-      aria-valuetext={`${LABEL[state]} — ${detail}`}
+      aria-valuetext={`${LABEL[state]}: ${detail}`}
       title={detail}
       className={`inline-flex min-h-9 shrink-0 items-center gap-2 rounded-pill px-3 text-sm font-bold motion-safe:transition-colors motion-safe:duration-300 ${CHIP[state]}`}
     >

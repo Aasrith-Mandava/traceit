@@ -86,7 +86,7 @@ describe('POST /api/lectures/live', () => {
   it('defaults the title and validates the body', async () => {
     const res = await r.create.POST(json('/api/lectures/live', {}));
     expect(res.status).toBe(201);
-    expect(((await res.json()) as { lecture: Lecture }).lecture.title).toMatch(/^Live lecture — /);
+    expect(((await res.json()) as { lecture: Lecture }).lecture.title).toMatch(/^Live lecture · /);
     expect((await r.create.POST(json('/api/lectures/live', { title: 7 }))).status).toBe(400);
     expect((await r.create.POST(json('/api/lectures/live', ['x']))).status).toBe(400);
     expect((await r.create.POST(post('/api/lectures/live', '{nope', { 'content-type': 'application/json' }))).status).toBe(400);

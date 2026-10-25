@@ -50,7 +50,7 @@ test("DEMO_MODE: lecture upload, Notability PDF import and auto-transcribe are d
 
   // The seeded PDF is still the current import.
   const current = (await (await request.get("/api/sessions/demo-maya-1/notability")).json()) as { import: { fileName: string } | null };
-  expect(current.import?.fileName).toBe("Chain rule — Maya (Notability export).pdf");
+  expect(current.import?.fileName).toBe("Chain rule - Maya (Notability export).pdf");
 
   await page.goto("/lectures/new");
   await expect(page.getByTestId("upload-demo-note")).toHaveText(note("Adding a lecture"));

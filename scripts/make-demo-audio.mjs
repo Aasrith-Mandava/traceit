@@ -45,7 +45,7 @@ writeFileSync(join(outDir, "lecture.wav"), buf);
 const meta = {
   lectureId: "demo-chain-rule",
   courseId: "calc1",
-  title: "Calculus I — The Chain Rule (demo)",
+  title: "Calculus I: The Chain Rule (demo)",
   durationMs: DURATION_S * 1000,
   audioUrl: "/demo/lecture.wav",
 };

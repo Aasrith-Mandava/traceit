@@ -98,7 +98,7 @@ export default async function SignalLabPage(props: PageProps<"/insights/[session
             <Stat dark label="spikes flagged" value={String(data.spikeCount)} testId="signal-stat-spikes" />
             <Stat
               label="highest score"
-              value={data.peak ? formatScore(data.peak.score) : "—"}
+              value={data.peak ? formatScore(data.peak.score) : "n/a"}
               note={data.peak ? `at ${formatClock(data.peak.startMs)}` : undefined}
               testId="signal-stat-peak"
             />

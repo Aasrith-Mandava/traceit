@@ -53,7 +53,7 @@ export default function LiveLectureStart({ available }: { available: boolean }) 
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           maxLength={200}
-          placeholder="e.g. Organic Chem — Week 3"
+          placeholder="e.g. Organic Chem: Week 3"
           disabled={!available}
           aria-describedby={noteId}
           className="min-h-12 w-full rounded-md border-[1.5px] border-line bg-chrome-hover px-3.5 text-base text-ink transition-colors placeholder:text-ink-subtle hover:border-accent-line disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:border-line"

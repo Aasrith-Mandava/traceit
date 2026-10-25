@@ -167,9 +167,9 @@ class SpeechLoop {
         this.want = false;
         this.cb.onError("This browser can’t transcribe that language. Pick another one.");
       } else if (e.error === "network") {
-        this.cb.onError("The browser’s speech service can’t be reached — retrying.");
+        this.cb.onError("The browser’s speech service can’t be reached. Retrying.");
       } else if (e.error === "audio-capture") {
-        this.cb.onError("The speech service can’t use your microphone (another app may have it) — retrying.");
+        this.cb.onError("The speech service can’t use your microphone (another app may have it). Retrying.");
       }
     };
     rec.onend = () => {
@@ -294,7 +294,7 @@ export function useLiveCapture({ lectureId, enabled, offsetMs }: Options) {
       if (res.status === 403) blockedRef.current = true;
       if (!res.ok) {
         const body = (await res.json().catch(() => ({}))) as { error?: string };
-        setSaveError(body.error || `Transcript not saved (HTTP ${res.status}) — retrying`);
+        setSaveError(body.error || `Transcript not saved (HTTP ${res.status}), retrying`);
         return false;
       }
       // Confirmed: drop exactly what was sent (more may have arrived meanwhile).
@@ -302,7 +302,7 @@ export function useLiveCapture({ lectureId, enabled, offsetMs }: Options) {
       setSaveError(null);
       return true;
     } catch {
-      setSaveError("Transcript not saved — check your connection. Retrying…");
+      setSaveError("Transcript not saved. Check your connection. Retrying…");
       return false;
     }
   }, [lectureId, getMs]);

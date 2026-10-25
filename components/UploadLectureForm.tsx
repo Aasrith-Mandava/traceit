@@ -245,7 +245,7 @@ export default function UploadLectureForm({
     };
     xhr.onerror = () => {
       setProgress(null);
-      setError("Upload failed — check your connection and try again.");
+      setError("Upload failed. Check your connection and try again.");
     };
     setError(null);
     setProgress(0);
@@ -317,7 +317,7 @@ export default function UploadLectureForm({
           data-testid="title-input"
           value={title}
           maxLength={200}
-          placeholder="e.g. Calculus I — Related rates"
+          placeholder="e.g. Calculus I: Related rates"
           onChange={(e) => {
             titleEdited.current = true;
             setTitle(e.target.value);

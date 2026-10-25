@@ -345,7 +345,7 @@ function momentsPages(doc: PDFDocument, fonts: Fonts, input: NotabilityExportInp
 
   const blocks = momentBlocks(input.events, input.revisions);
   if (blocks.length === 0) {
-    para("No moments in this session yet — your notes were written through without corrections or hesitations.", fonts.regular, 11, C.ink);
+    para("No moments in this session yet. Your notes were written through without corrections or hesitations.", fonts.regular, 11, C.ink);
     return;
   }
   for (const block of blocks) {

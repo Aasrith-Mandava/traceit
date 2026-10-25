@@ -89,7 +89,7 @@ test("seeded session: corrected + gap markers, detail panel with before/after an
   await expect(page.getByTestId("moment-reasons")).toContainText(/rewrote it 3s later/);
   await expect(page.getByTestId("moment-excerpt")).toContainText(/\w+ \w+ \w+/);
   // Phase 5 replaced the placeholder; this project runs without AI, so the quiet "needs a key" card shows.
-  await expect(detail.getByTestId("help-nokey")).toHaveText("AI explanations need an API key — add OPENAI_API_KEY to .env.local");
+  await expect(detail.getByTestId("help-nokey")).toHaveText("AI explanations need an API key. Add OPENAI_API_KEY to .env.local");
   await expect.poll(() => paintedPixels(page, "before-canvas")).toBeGreaterThan(40);
   await expect.poll(() => paintedPixels(page, "after-canvas")).toBeGreaterThan(40);
   await expect(page.getByTestId("review-canvas")).toHaveAttribute("data-highlight", "on");
@@ -247,7 +247,7 @@ test("a calm session shows the empty state (analysed on open)", async ({ page, r
   await expect(page.getByTestId("timeline")).toHaveAttribute("data-status", "ready");
   await expect(page.getByTestId("timeline-empty")).toBeVisible();
   await expect(page.getByTestId("timeline-empty")).toHaveText(
-    "Not enough writing to spot anything yet — write along for a few minutes while the lecture plays, then finish again.",
+    "Not enough writing to spot anything yet. Write along for a few minutes while the lecture plays, then finish again.",
   );
   await expect(page.getByTestId("timeline-hint")).toHaveCount(0);
   await expect(page.getByTestId("moment-detail")).toHaveCount(0);
@@ -264,7 +264,7 @@ test("a calm session shows the empty state (analysed on open)", async ({ page, r
   expect((await analyze(request, longId)).events).toEqual([]);
   await page.goto(`/review/${longId}`);
   await expect(page.getByTestId("timeline")).toHaveAttribute("data-status", "ready");
-  await expect(page.getByTestId("timeline-empty")).toHaveText("Nothing flagged — your notes flowed steadily all the way through.");
+  await expect(page.getByTestId("timeline-empty")).toHaveText("Nothing flagged. Your notes flowed steadily all the way through.");
 });
 
 test.describe("analysis API", () => {

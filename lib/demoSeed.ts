@@ -34,7 +34,7 @@ import { countPdfPages, storedPdfName } from "./notability";
 import { pdfUploadTarget, resolvePdfPath } from "./storage";
 import type { TimelineEvent } from "./types";
 
-export const DEMO_PDF_NAME = "Chain rule — Maya (Notability export).pdf";
+export const DEMO_PDF_NAME = "Chain rule - Maya (Notability export).pdf";
 
 export interface SeedSummary {
   status: "seeded" | "already-seeded";
@@ -147,7 +147,7 @@ export async function seedDemo(
   if (!graded.ok || !graded.correct) throw new Error("demo scenario: could not answer the 01:02 check question");
 
   // The Notability export of session 1: the final page only.
-  const pdf = await renderFinalPagePdf(await db.getStrokes(DEMO_SESSIONS.s1.id), { title: "Chain rule — Maya", createdAt: new Date(s1At) });
+  const pdf = await renderFinalPagePdf(await db.getStrokes(DEMO_SESSIONS.s1.id), { title: "Chain rule - Maya", createdAt: new Date(s1At) });
   const storedName = storedPdfName();
   await writeFile(pdfUploadTarget(storedName), pdf, { flag: "wx", mode: 0o600 });
   await db.addNotabilityImport({

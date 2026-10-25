@@ -17,9 +17,9 @@ function siteUrl(): URL {
   return new URL(`http://localhost:${process.env.PORT || 3000}`);
 }
 
-const title = "TraceIt — Study notes that learn from your mistakes";
+const title = "TraceIt: Study notes that learn from your mistakes";
 const description =
-  "Your eraser is hiding the good stuff. TraceIt quietly watches how you write during a lecture — the pauses, the scratch-outs, the do-overs — and turns them into a trail of what you fixed, what still feels fuzzy, and the exact second of lecture behind each one.";
+  "Your eraser is hiding the good stuff. TraceIt quietly watches how you write during a lecture (the pauses, the scratch-outs, the do-overs) and turns them into a trail of what you fixed, what still feels fuzzy, and the exact second of lecture behind each one.";
 
 export const metadata: Metadata = {
   metadataBase: siteUrl(),

@@ -11,11 +11,11 @@ export default function SignalLegend() {
   const steps: Array<{ title: string; body: string }> = [
     {
       title: "Learn your normal",
-      body: `The first ${c.baselineMs / 60000} minutes of your own writing are your baseline. Nothing there is ever flagged — it is what the rest is compared against, so a slow writer isn't "stuck" just for being slow.`,
+      body: `The first ${c.baselineMs / 60000} minutes of your own writing are your baseline. Nothing there is ever flagged. It is what the rest is compared against, so a slow writer isn't "stuck" just for being slow.`,
     },
     {
       title: "Read four signals every 10 seconds",
-      body: "Each signal is scaled from 0 (like your normal) to 1 (far from it), measured against your baseline — not against other students.",
+      body: "Each signal is scaled from 0 (like your normal) to 1 (far from it), measured against your baseline, not against other students.",
     },
     {
       title: "Blend and smooth",

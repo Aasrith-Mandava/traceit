@@ -236,8 +236,8 @@ export default function Timeline({
             >
               <span className="rounded-[12px] bg-chrome/90 px-3 py-1 text-center text-sm text-pretty text-ink-muted">
                 {littleInk
-                  ? "Not enough writing to spot anything yet — write along for a few minutes while the lecture plays, then finish again."
-                  : "Nothing flagged — your notes flowed steadily all the way through."}
+                  ? "Not enough writing to spot anything yet. Write along for a few minutes while the lecture plays, then finish again."
+                  : "Nothing flagged. Your notes flowed steadily all the way through."}
               </span>
             </p>
           ) : null}

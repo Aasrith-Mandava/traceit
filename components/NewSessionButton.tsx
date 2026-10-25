@@ -107,7 +107,7 @@ export default function NewSessionButton({ lectures, defaultLectureId }: Props) 
           />
         </div>
         <p data-testid="lecture-meta" className="font-mono text-[13px] text-ink-subtle">
-          {selected ? lectureMeta(selected) : "No lectures yet — upload one first"}
+          {selected ? lectureMeta(selected) : "No lectures yet. Upload one first"}
         </p>
         {/* Any recording can be studied: uploads join this list (and arrive pre-selected). */}
         <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">

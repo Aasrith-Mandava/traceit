@@ -116,7 +116,7 @@ test("scribbling over a word erases it into ghost ink, with a toast, and it pers
   await expect(page.getByTestId("stroke-counter")).toHaveText("1 pen stroke · 1 ghost");
   const toast = page.getByTestId("scribble-toast");
   await expect(toast).toBeVisible();
-  await expect(toast).toContainText("Scribbled out — kept as ghost");
+  await expect(toast).toContainText("Scribbled out, kept as ghost");
   await expect(page.getByTestId("scribble-undo")).toBeVisible();
 
   // Ghost off: once the fade finishes the area holds no ink at all.

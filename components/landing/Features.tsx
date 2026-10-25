@@ -74,7 +74,7 @@ const FEATURES: Feature[] = [
     title: "Self-tests from your slips",
     body: "Each mistake comes with a short explanation and a multiple-choice question built around it, so you can check that it actually stuck.",
     detail:
-      "For every moment, TraceIt reads what you changed — the before and after of your handwriting — and what the lecturer was saying at that second, then writes an explanation of about 80 words and one multiple-choice question. Your answer is checked on the server: get it right and the fix becomes an Aha moment.",
+      "For every moment, TraceIt reads what you changed (the before and after of your handwriting) and what the lecturer was saying at that second, then writes an explanation of about 80 words and one multiple-choice question. Your answer is checked on the server: get it right and the fix becomes an Aha moment.",
     icon: QuestionIcon,
     chip: "bg-breakthrough-soft text-breakthrough-strong",
     card: PLAIN_CARD,
@@ -85,7 +85,7 @@ const FEATURES: Feature[] = [
     title: "Hear it again",
     body: "Replay the exact stretch of lecture you were writing through, read the captions, or have a recap read out loud.",
     detail:
-      "Replay the stretch of lecture around any moment and follow along in the captions. Explanations, self-tests and the spoken session recap come in 10 languages — English, Spanish, Hindi, Mandarin, Arabic, French, Telugu, Korean, Vietnamese and Brazilian Portuguese — and any of them can be read aloud, with an ElevenLabs voice or your browser's own.",
+      "Replay the stretch of lecture around any moment and follow along in the captions. Explanations, self-tests and the spoken session recap come in 10 languages (English, Spanish, Hindi, Mandarin, Arabic, French, Telugu, Korean, Vietnamese and Brazilian Portuguese), and any of them can be read aloud, with an ElevenLabs voice or your browser's own.",
     icon: SpeakerIcon,
     chip: "bg-gap-soft text-gap-strong",
     card: PLAIN_CARD,
@@ -281,8 +281,8 @@ function UnderTheHood({ href }: { href: string }) {
       <div className="min-w-0 flex-[1_1_320px]">
         <h3 className="text-[18px] font-bold text-ink">See the details</h3>
         <p className="mt-1 text-[15px] leading-relaxed text-pretty text-ink-muted">
-          See which signals fired for each moment — slower writing, extra erasing, going quiet while the lecturer kept
-          talking, pen pressure — and how detection holds up against hand-labelled demo sessions, including what the
+          See which signals fired for each moment (slower writing, extra erasing, going quiet while the lecturer kept
+          talking, pen pressure) and how detection holds up against hand-labelled demo sessions, including what the
           threshold changes.
         </p>
       </div>

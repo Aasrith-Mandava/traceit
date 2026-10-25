@@ -6,7 +6,7 @@ import type { CaseResult, EvaluationReport, Metrics } from "@/lib/evaluation";
 import { MOMENT_META } from "@/lib/moments";
 import { formatClock } from "@/lib/time";
 
-const fmt = (v: number | null) => (v === null ? "—" : v.toFixed(2));
+const fmt = (v: number | null) => (v === null ? "n/a" : v.toFixed(2));
 const signedS = (ms: number) => `${ms > 0 ? "+" : ms < 0 ? "−" : "±"}${Math.abs(Math.round(ms / 100) / 10)} s`;
 
 export const DETECTORS: Array<{ key: "spikes" | "moments"; title: string; blurb: string }> = [
@@ -190,7 +190,7 @@ export function LabelTable({ report }: { report: EvaluationReport }) {
                     </Outcome>
                   ) : (
                     <Outcome kind="fn">
-                      <span className="font-sans">{inBaseline(c, label.atMs) ? "inside the baseline — never flagged by design" : "missed"}</span>
+                      <span className="font-sans">{inBaseline(c, label.atMs) ? "inside the baseline, never flagged by design" : "missed"}</span>
                     </Outcome>
                   )}
                 </td>
@@ -228,7 +228,7 @@ export function LabelTable({ report }: { report: EvaluationReport }) {
       </div>
       {unlabeled.length ? (
         <p className="px-1 text-xs text-pretty text-ink-subtle">
-          {unlabeled.map((c) => c.title).join(", ")}: no labels (calm notes) — any flag there would be a false positive
+          {unlabeled.map((c) => c.title).join(", ")}: no labels (calm notes), so any flag there would be a false positive
           {falsePositives.some((f) => unlabeled.includes(f.c)) ? "." : "; none were raised."}
         </p>
       ) : null}

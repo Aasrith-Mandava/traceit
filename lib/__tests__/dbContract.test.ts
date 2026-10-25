@@ -132,7 +132,7 @@ describe.each(backends)('Db contract: %s', (_name, open, backend) => {
       const a = await newSession({ studentId: 'st-sessions', title: '  First  ' });
       const b = await newSession({ studentId: 'st-sessions', title: '' });
       expect(a).toMatchObject({ studentId: 'st-sessions', lectureId: DEMO, title: 'First', inputKind: null, hasPressure: false });
-      expect(b.title).toMatch(/^Notes — /);
+      expect(b.title).toMatch(/^Notes · /);
       expect(a.createdAtIso < b.createdAtIso).toBe(true);
       expect(await db.getSession(a.id)).toEqual(a);
       expect(await db.getSession('s_missing')).toBeNull();

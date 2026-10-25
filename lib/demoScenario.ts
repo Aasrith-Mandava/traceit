@@ -17,8 +17,8 @@ import { handwrite } from "./handwriting";
 import type { EraseEvent, Stroke } from "./types";
 
 export const DEMO_SESSIONS = {
-  s1: { id: "demo-maya-1", title: "Maya — Session 1" },
-  s2: { id: "demo-maya-2", title: "Maya — Session 2" },
+  s1: { id: "demo-maya-1", title: "Maya · Session 1" },
+  s2: { id: "demo-maya-2", title: "Maya · Session 2" },
 } as const;
 
 export const DEMO_CLASSMATES = 5;

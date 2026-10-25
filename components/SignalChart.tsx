@@ -296,7 +296,7 @@ export default function SignalChart({ data, sessionId, sessionTitle }: { data: S
                 </text>
                 {unused ? (
                   <text x={M.left + 8} y={top + STRIP_H / 2 + 4} className="fill-ink-subtle text-[11px]">
-                    Not used — no pen pressure in this session
+                    Not used: no pen pressure in this session
                   </text>
                 ) : (
                   points.map((p) => {
@@ -409,7 +409,7 @@ export default function SignalChart({ data, sessionId, sessionTitle }: { data: S
         <LegendKey kind="line">Smoothed score</LegendKey>
         <LegendKey kind="column">Raw score (this window only)</LegendKey>
         <LegendKey kind="dash">Spike threshold (flagged above)</LegendKey>
-        <LegendKey kind="spike">Spike — click to open the moment</LegendKey>
+        <LegendKey kind="spike">Spike: click to open the moment</LegendKey>
         <LegendKey kind="bar">Signal on (≥ {formatScore(featureOn)})</LegendKey>
         <LegendKey kind="hatch">Baseline</LegendKey>
       </figcaption>
@@ -468,7 +468,7 @@ function Tooltip({ point: p, spikeScore, featureOn, left, width }: { point: Sign
         </span>
       </div>
       {p.phase === "idle" ? (
-        <p className="text-pretty text-ink-muted">No ink nearby — this stretch isn’t scored.</p>
+        <p className="text-pretty text-ink-muted">No ink nearby, so this stretch isn’t scored.</p>
       ) : (
         <>
           <div className="flex items-baseline gap-2">
@@ -486,7 +486,7 @@ function Tooltip({ point: p, spikeScore, featureOn, left, width }: { point: Sign
                     <span aria-hidden="true" className={`h-0.5 w-2.5 rounded-pill ${v !== null && v >= featureOn ? "bg-accent" : "bg-accent/35"}`} />
                     {f.label}
                   </dt>
-                  <dd className="text-right font-mono font-medium tabular-nums text-ink">{v === null ? "—" : formatScore(v)}</dd>
+                  <dd className="text-right font-mono font-medium tabular-nums text-ink">{v === null ? "n/a" : formatScore(v)}</dd>
                 </div>
               );
             })}

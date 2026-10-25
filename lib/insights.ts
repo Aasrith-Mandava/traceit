@@ -143,7 +143,7 @@ export function shapeSignalLab(
   // Above the line but not flagged: say which rule held it back (mirrors lib/scoring's spike rules).
   for (const p of points) {
     if (p.isSpike || p.score < cfg.spikeScore || p.phase === "idle") continue;
-    if (p.phase === "baseline") p.note = "Above the line, but in the baseline — never flagged";
+    if (p.phase === "baseline") p.note = "Above the line, but in the baseline, so never flagged";
     else if (p.featuresOn.length < cfg.minFeaturesOn) {
       const n = p.featuresOn.length;
       p.note = `Above the line, but only ${n} signal${n === 1 ? "" : "s"} on (needs ${cfg.minFeaturesOn})`;
@@ -202,7 +202,7 @@ export const formatScore = (n: number): string => n.toFixed(2);
 
 const PHASE_TEXT: Record<WindowPhase, string> = {
   idle: "not taking notes (not scored)",
-  baseline: "baseline — calibrating your normal (never flagged)",
+  baseline: "baseline: calibrating your normal (never flagged)",
   scored: "scored",
 };
 
@@ -217,7 +217,7 @@ export function describePoint(p: SignalPoint, spikeScore: number): string {
   }).join(", ");
   const parts = [
     `${range}: score ${formatScore(p.score)}, ${vs} the ${formatScore(spikeScore)} threshold`,
-    p.isSpike ? "spike — flagged as stuck" : p.note ?? PHASE_TEXT[p.phase],
+    p.isSpike ? "spike: flagged as stuck" : p.note ?? PHASE_TEXT[p.phase],
     feats,
   ];
   if (p.reasons.length) parts.push(`why: ${p.reasons.join("; ")}`);

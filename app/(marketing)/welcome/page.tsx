@@ -86,7 +86,7 @@ const PRIVACY: { title: string; body: string; icon: Icon }[] = [
   },
   {
     title: "Works fully offline",
-    body: "Demo mode runs from saved, hand-checked answers with no network at all — handy in a classroom with patchy Wi-Fi.",
+    body: "Demo mode runs from saved, hand-checked answers with no network at all, which is handy in a classroom with patchy Wi-Fi.",
     icon: WifiOffIcon,
   },
 ];
@@ -205,7 +205,7 @@ export default function Home() {
                   Three minutes, one slip, <Highlight>caught</Highlight>.
                 </>
               }
-              lead="A student takes notes on a chain-rule lecture, gets one step wrong, fixes it — and TraceIt shows everything the final page would have hidden."
+              lead="A student takes notes on a chain-rule lecture, gets one step wrong, fixes it, and TraceIt shows everything the final page would have hidden."
               center
             />
             <Reveal className="mx-auto mt-10 max-w-[1000px]">

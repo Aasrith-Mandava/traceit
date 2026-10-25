@@ -251,8 +251,8 @@ test("capture: while paused the band says “Press ▶” (before writing, and a
   // Nothing written yet, paused: the hint is up, inside the band (never over the page).
   await expect(hint).toBeVisible();
   await expect(hint).toContainText("Press ▶");
-  await expect(hint).toContainText("— your notes are timed to the lecture.");
-  await expect(toggle).toHaveAccessibleDescription("Press play — your notes are timed to the lecture.");
+  await expect(hint).toContainText(". Your notes are timed to the lecture.");
+  await expect(toggle).toHaveAccessibleDescription("Press play to start. Your notes are timed to the lecture.");
   const pageTop = (await canvas.boundingBox())!.y;
   const bandBox = (await band.boundingBox())!;
   const hintBox = (await hint.boundingBox())!;

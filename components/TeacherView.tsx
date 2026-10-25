@@ -77,7 +77,7 @@ function useStretchPlayer(mediaRef: React.RefObject<HTMLMediaElement | null>) {
         if (err instanceof DOMException && err.name === "AbortError") return;
         playingRef.current = null;
         setPlaying(null);
-        setError("Couldn’t play the lecture — try again.");
+        setError("Couldn’t play the lecture. Try again.");
       }
     },
     [mediaRef],
@@ -140,7 +140,7 @@ function MomentCard({
             </blockquote>
           </div>
         ) : (
-          <p className="text-sm text-ink-subtle">No captions for this stretch — hit play to hear what was said.</p>
+          <p className="text-sm text-ink-subtle">No captions for this stretch. Hit play to hear what was said.</p>
         )}
       </div>
       <button
@@ -271,8 +271,8 @@ export default function TeacherView({
               Fewer than 3 students have written along so far
             </p>
             <p className="max-w-xl text-[15px] text-pretty text-ink-muted">
-              To keep everyone anonymous, class insights appear once at least 3 students have taken notes on this lecture
-              — so no pattern can be traced back to one person.
+              To keep everyone anonymous, class insights appear once at least 3 students have taken notes on this lecture,
+              so no pattern can be traced back to one person.
             </p>
           </section>
         ) : null}
@@ -308,7 +308,7 @@ export default function TeacherView({
               </div>
               {view.moments.length === 0 ? (
                 <p data-testid="reteach-none" className="panel px-5 py-5 text-[15px] text-pretty text-ink-muted">
-                  No stretch stood out — the room barely hesitated or erased during this lecture.
+                  No stretch stood out. The room barely hesitated or erased during this lecture.
                 </p>
               ) : (
                 <ol data-testid="reteach-list" className="flex flex-col gap-3.5">

@@ -66,7 +66,7 @@ test("light hero, sections, nav, CTAs, video and meta", async ({ page }) => {
   await page.goto("/welcome");
 
   await expect(page.getByRole("heading", { level: 1 })).toHaveText(HEADLINE);
-  await expect(page).toHaveTitle("TraceIt — Study notes that learn from your mistakes");
+  await expect(page).toHaveTitle("TraceIt: Study notes that learn from your mistakes");
   const badge = page.locator("#top").getByText("Study notes that learn from your mistakes");
   await expect(badge).toBeVisible();
   await expect(badge.getByText("NEW", { exact: true })).toBeVisible();

@@ -144,7 +144,7 @@ test("an empty page shows the faint 'messy = progress' hint until the first stro
   await newSession(page);
   const hint = page.getByTestId("capture-empty-hint");
   await expect(hint).toBeVisible();
-  await expect(hint).toHaveText("messy = progress — scribble boldly. Every crossed-out line stays as a faint ghost.");
+  await expect(hint).toHaveText("messy = progress. Scribble boldly. Every crossed-out line stays as a faint ghost.");
   await expect(hint).toHaveAttribute("aria-hidden", "true");
   await expect(hint).toHaveCSS("pointer-events", "none");
 
