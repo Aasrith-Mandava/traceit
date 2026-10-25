@@ -131,7 +131,7 @@ Playwright starts its own servers on ports **3100** and **3101**, so those must 
 3. Health check path: `/api/health`.
 
 Every push to `main` redeploys. On the free plan the disk resets on restart, which is fine for demo mode
-because the sample data is re-seeded on start. For Railway, see [`docs/railway.md`](docs/railway.md).
+because the sample data is re-seeded on start.
 
 ## Project structure
 
