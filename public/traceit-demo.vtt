@@ -1,170 +1,136 @@
 WEBVTT
 
-00:00:00.000 --> 00:00:03.761
-A student is watching an algebra lecture on expanding brackets.
+1
+00:00:02.088 --> 00:00:04.712
+Every lecture, students make mistakes.
 
-00:00:03.811 --> 00:00:06.956
-They write an answer, hesitate, erase it,
+2
+00:00:04.712 --> 00:00:06.065
+Then they erase them.
 
-00:00:06.956 --> 00:00:10.279
-and fix it: they'd forgotten the middle term.
+3
+00:00:06.065 --> 00:00:07.413
+The confusion…
 
-00:00:10.495 --> 00:00:12.191
-Their final notes look perfect.
+4
+00:00:07.413 --> 00:00:08.681
+the false start…
 
-00:00:12.191 --> 00:00:16.829
-But every note app threw away the most important part:
+5
+00:00:08.681 --> 00:00:10.688
+the moment it almost clicked.
 
-00:00:16.829 --> 00:00:19.943
-the mistake, and the moment they fixed it.
+6
+00:00:10.688 --> 00:00:11.501
+Gone.
 
-00:00:20.025 --> 00:00:22.932
-The pauses, the erasing, the rewrites:
+7
+00:00:11.501 --> 00:00:14.110
+Every notes app keeps only the final page.
 
-00:00:22.932 --> 00:00:25.934
-that's where learning actually happens.
+8
+00:00:14.110 --> 00:00:16.272
+But the learning happened before that.
 
-00:00:25.934 --> 00:00:29.275
-And today, nobody sees it.
+9
+00:00:16.300 --> 00:00:19.496
+What if your eraser… was
+your best study guide?
 
-00:00:29.325 --> 00:00:30.783
-Inkling keeps them.
+10
+00:00:21.400 --> 00:00:24.875
+That's TraceIt. Notes that
+remember how you learned.
 
-00:00:33.281 --> 00:00:35.737
-Inkling was built by Pranav Chowdary.
+11
+00:00:24.875 --> 00:00:27.691
+You write along with any
+lecture, recorded or live.
 
-00:00:36.629 --> 00:00:37.715
-This is Inkling.
+12
+00:00:27.691 --> 00:00:29.613
+And nothing you erase is lost.
 
-00:00:37.715 --> 00:00:41.083
-Here it is in the app, on a real calculus lecture.
+13
+00:00:29.613 --> 00:00:33.332
+It becomes ghost ink, stamped to
+the exact second of the lecture.
 
-00:00:41.240 --> 00:00:44.488
-Here's Maya, taking notes while the lecture plays.
+14
+00:00:33.332 --> 00:00:36.340
+TraceIt reads your pauses,
+slow-downs and do-overs…
 
-00:00:44.488 --> 00:00:48.295
-Every stroke is tied to that moment in the lecture.
+15
+00:00:36.340 --> 00:00:38.152
+…against your own pace.
 
-00:00:53.176 --> 00:00:56.274
-She hesitates, then erases cos(x²).
+16
+00:00:38.700 --> 00:00:40.885
+Every struggle becomes a moment.
 
-00:00:56.274 --> 00:00:58.681
-Inkling keeps it as ghost ink.
+17
+00:00:41.795 --> 00:00:44.682
+Hit Finish, and your mistakes
+become a guided review.
 
-00:00:58.906 --> 00:01:01.279
-She rewrites it and ends the session.
+18
+00:00:44.682 --> 00:00:45.792
+What went wrong.
 
-00:01:02.844 --> 00:01:06.637
-Inkling pairs the mistake with its fix, right on the page.
+19
+00:00:46.100 --> 00:00:48.694
+What the professor said
+at that exact second.
 
-00:01:06.804 --> 00:01:10.374
-Across a full lecture, Inkling marks corrected mistakes,
+20
+00:00:48.694 --> 00:00:51.287
+And a quick self-test, in ten languages.
 
-00:01:10.374 --> 00:01:14.755
-moments she got stuck, and breakthroughs, all from how she writes.
+21
+00:00:51.287 --> 00:00:53.496
+Get it right… and it's an aha moment.
 
-00:01:14.805 --> 00:01:18.730
-At 1:40, she rewrote cos(x²) as cos(x²) · 2x.
+22
+00:00:53.496 --> 00:00:56.598
+Fuzzy spots follow you,
+until you've truly got it.
 
-00:01:18.730 --> 00:01:24.238
-Inkling reads the change: she forgot the inner derivative.
+23
+00:00:56.598 --> 00:00:57.700
+And for teachers…
 
-00:01:24.536 --> 00:01:28.360
-It re-teaches that one step and asks a check question.
+24
+00:00:57.700 --> 00:00:59.871
+one class, one join code.
 
-00:01:28.360 --> 00:01:31.431
-She gets it right: a breakthrough.
+25
+00:01:00.100 --> 00:01:03.078
+See the exact minute
+the whole room got lost.
 
-00:01:31.666 --> 00:01:33.609
-The same help comes in her own language,
+26
+00:01:03.078 --> 00:01:05.100
+Anonymous. Never a name.
 
-00:01:33.609 --> 00:01:36.268
-here Spanish, with the math unchanged.
+27
+00:01:05.100 --> 00:01:07.921
+And the three moments
+most worth re-teaching.
 
-00:01:36.650 --> 00:01:40.866
-Here she got stuck while the lecturer kept talking.
+28
+00:01:08.400 --> 00:01:10.874
+Students learn from their own mistakes.
 
-00:01:40.866 --> 00:01:44.038
-Replay plays the exact 20 seconds she missed.
+29
+00:01:11.000 --> 00:01:12.653
+Teachers see where to help.
 
-00:01:44.278 --> 00:01:48.019
-Inkling uses Signal Lab to detect where she got stuck.
+30
+00:01:13.700 --> 00:01:17.016
+TraceIt. Your eraser is
+hiding the good stuff.
 
-00:01:48.019 --> 00:01:51.289
-Every stroke is time-stamped to the lecture.
-
-00:01:51.289 --> 00:01:52.994
-Every 10 seconds,
-
-00:01:52.994 --> 00:01:56.486
-Inkling tracks four signals against her own normal:
-
-00:01:56.486 --> 00:01:59.144
-pauses while the lecturer keeps talking,
-
-00:01:59.144 --> 00:02:01.747
-slower writing, extra erasing,
-
-00:02:01.747 --> 00:02:04.244
-and pen pressure when the pen reports it.
-
-00:02:04.244 --> 00:02:08.267
-Each spike in the score becomes a moment to re-teach.
-
-00:02:08.998 --> 00:02:12.303
-A Notability export keeps only the final page.
-
-00:02:12.303 --> 00:02:14.352
-Inkling shows everything it hid,
-
-00:02:14.352 --> 00:02:17.293
-and can send it all back as a PDF.
-
-00:02:17.520 --> 00:02:19.984
-Open gaps carry into her next session,
-
-00:02:19.984 --> 00:02:21.932
-until she writes through them.
-
-00:02:22.090 --> 00:02:24.234
-For teachers, Inkling shows where
-
-00:02:24.234 --> 00:02:26.446
-the whole class slowed down together,
-
-00:02:26.446 --> 00:02:29.043
-and the moments most worth re-teaching,
-
-00:02:29.043 --> 00:02:30.670
-all from anonymous pen data.
-
-00:02:30.720 --> 00:02:32.624
-Next.js runs the app,
-
-00:02:32.624 --> 00:02:36.289
-Gemini reads the handwriting, Groq writes the help,
-
-00:02:36.289 --> 00:02:38.095
-ElevenLabs speaks it,
-
-00:02:38.095 --> 00:02:40.792
-Tiger Data stores every pen stroke as time-series,
-
-00:02:40.792 --> 00:02:45.335
-Inkling uses its own Signal Lab to detect where you got stuck,
-
-00:02:45.335 --> 00:02:48.270
-and it all round-trips with Notability.
-
-00:02:48.320 --> 00:02:49.901
-The code is on GitHub.
-
-00:02:51.450 --> 00:02:52.272
-Inkling.
-
-00:02:52.272 --> 00:02:54.791
-Every other app deletes your mistakes.
-
-00:02:54.791 --> 00:02:56.154
-We keep them.
-
+31
+00:01:17.100 --> 00:01:18.231
+Try the demo.

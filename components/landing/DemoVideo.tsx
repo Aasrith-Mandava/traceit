@@ -55,13 +55,13 @@ export function DemoVideo() {
             type="button"
             onClick={play}
             className="group absolute bottom-3 left-3 inline-flex min-h-11 items-center gap-2.5 rounded-pill border-[1.5px] border-ink bg-white py-1.5 pr-4 pl-1.5 text-[15px] font-bold text-ink shadow-float transition-[translate,box-shadow] duration-200 hover:-translate-y-0.5 sm:bottom-5 sm:left-5"
-            aria-label="Play the demo video (2 minutes 59 seconds)"
+            aria-label="Play the demo video (1 minute 21 seconds)"
           >
             <span className="inline-flex size-8 items-center justify-center rounded-pill bg-highlight text-on-highlight">
               <PlayIcon size={13} />
             </span>
             Play demo
-            <span className="font-mono text-[13px] font-medium text-ink-subtle">· 2:59</span>
+            <span className="font-mono text-[13px] font-medium text-ink-subtle">· 1:21</span>
           </button>
         </>
       )}

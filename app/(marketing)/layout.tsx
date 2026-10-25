@@ -38,7 +38,7 @@ export const metadata: Metadata = {
       {
         url: "/traceit-demo-poster.jpg",
         width: 1280,
-        height: 800,
+        height: 720,
         alt: "TraceIt's study screen: an erased answer kept as a faded ghost under the rewrite, marked on the learning trail as a mistake you fixed.",
       },
     ],

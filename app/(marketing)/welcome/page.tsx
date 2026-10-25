@@ -199,7 +199,7 @@ export default function Home() {
           <div className="container-x section-y pt-0 sm:pt-0">
             <SectionHeader
               id="demo-title"
-              kicker="See it in action · 2:59"
+              kicker="See it in action · 1:21"
               title={
                 <>
                   Three minutes, one slip, <Highlight>caught</Highlight>.
