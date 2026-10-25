@@ -60,8 +60,8 @@ function newestSource() {
 function needsBuild() {
   if (flag("--build")) return true;
   if (flag("--no-build")) return false;
-  // next.config.ts builds into INKLING_DIST_DIR when set (e2e/preview servers), else .next.
-  const buildId = join(root, process.env.INKLING_DIST_DIR || ".next", "BUILD_ID");
+  // next.config.ts builds into TRACEIT_DIST_DIR when set (e2e/preview servers), else .next.
+  const buildId = join(root, process.env.TRACEIT_DIST_DIR || process.env.INKLING_DIST_DIR || ".next", "BUILD_ID");
   return !existsSync(buildId) || statSync(buildId).mtimeMs < newestSource();
 }
 
@@ -77,7 +77,7 @@ if (!flag("--no-seed")) run(flag("--reset") ? "Seeding the demo (reset)" : "Seed
 if (needsBuild()) run("Building for production (next build)", bin("next"), ["build"], { NODE_ENV: "production" });
 else console.log("\n▸ Production build is up to date (use --build to force a rebuild)");
 
-console.log(`\n▸ Starting Inkling in DEMO_MODE on ${host}:${port}`);
+console.log(`\n▸ Starting TraceIt in DEMO_MODE on ${host}:${port}`);
 console.log(`  This computer: http://localhost:${port}`);
 if (host === "0.0.0.0") {
   const lan = lanUrls();

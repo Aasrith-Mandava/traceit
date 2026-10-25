@@ -1,6 +1,6 @@
 "use client";
 
-// The floating "Ask Inkling" launcher (bottom-right). Light and always mounted; the chat panel
+// The floating "Ask TraceIt" launcher (bottom-right). Light and always mounted; the chat panel
 // itself is code-split and only loaded on intent (hover/focus/touch of the launcher) or on open.
 // Any part of the page can open it — optionally with a question — via openAssistant().
 import dynamic from "next/dynamic";
@@ -9,7 +9,6 @@ import { AnimatePresence, motion } from "motion/react";
 import { motionTokens, springs } from "@/lib/motion";
 import { ASK_EVENT, type AskEventDetail } from "../site";
 import { ChatIcon } from "../icons";
-import { LiquidMetal } from "../ui/liquid-metal";
 import { usePrefersReducedMotion } from "../../motion/usePrefersReducedMotion";
 import type { ChatMsg } from "./types";
 
@@ -57,18 +56,17 @@ export function AskLauncher() {
               type="button"
               aria-haspopup="dialog"
               aria-expanded={open}
-              aria-controls="ask-inkling"
+              aria-controls="ask-traceit"
               onClick={() => show()}
               onPointerEnter={() => void loadPanel()}
               onFocus={() => void loadPanel()}
               onTouchStart={() => void loadPanel()}
-              className="group relative isolate inline-flex min-h-14 items-center gap-2.5 overflow-hidden rounded-full py-2 pr-5 pl-2 text-[15px] font-semibold text-teal-950 shadow-[0_18px_40px_-16px_rgb(15_23_42/0.45),0_1px_0_rgb(255_255_255/0.8)_inset] ring-1 ring-teal-700/25 transition-[box-shadow,transform] duration-200 hover:-translate-y-0.5 hover:shadow-[0_22px_44px_-16px_rgb(13_148_136/0.6)] active:scale-[0.97]"
+              className="group inline-flex min-h-14 items-center gap-2.5 rounded-pill bg-accent py-2 pr-5 pl-2 text-[15px] font-bold text-on-accent shadow-[inset_0_1px_0_rgb(255_255_255/0.25),0_18px_40px_-14px_rgb(75_59_219/0.75)] transition-[background-color,box-shadow,translate] duration-200 hover:-translate-y-0.5 hover:bg-accent-hover"
             >
-              <LiquidMetal as="span" css variant="teal" aria-hidden="true" className="absolute inset-0 -z-10" />
-              <span className="inline-flex size-10 items-center justify-center rounded-full bg-teal-800 text-white shadow-inner">
+              <span className="inline-flex size-10 items-center justify-center rounded-pill bg-highlight text-on-highlight">
                 <ChatIcon size={20} />
               </span>
-              Ask Inkling
+              Ask TraceIt
             </button>
           </motion.div>
         )}

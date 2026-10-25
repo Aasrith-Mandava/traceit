@@ -18,7 +18,10 @@ async function drawLine(page: Page, x0: number, y: number, x1: number) {
   await page.mouse.up();
 }
 
-/** Counts teal ghost-ink pixels (#0d9488 at 40 %; never ink, never the sky-blue moment outline) on a canvas. */
+/**
+ * Counts light-indigo ghost-ink pixels (#8b80f9 drawn dashed at 50 %; never the #1d1a3a ink, never
+ * the green / orange / pink moment outlines) on a canvas.
+ */
 async function ghostPixelCount(page: Page, testId: string) {
   return page.getByTestId(testId).evaluate((el) => {
     const c = el as HTMLCanvasElement;
@@ -26,7 +29,7 @@ async function ghostPixelCount(page: Page, testId: string) {
     let n = 0;
     for (let i = 0; i < data.length; i += 4) {
       const [r, g, b, a] = [data[i], data[i + 1], data[i + 2], data[i + 3]];
-      if (a > 20 && r < 100 && g > 110 && b < g + 8 && g - r > 60) n++;
+      if (a > 20 && r > 90 && b > 200 && b - r > 70 && b - g > 80) n++;
     }
     return n;
   });
@@ -34,8 +37,10 @@ async function ghostPixelCount(page: Page, testId: string) {
 
 test("home page shows title and tagline", async ({ page }) => {
   await page.goto("/app");
-  await expect(page.getByRole("heading", { name: "Inkling" })).toBeVisible();
-  await expect(page.getByTestId("tagline")).toHaveText("Every other app deletes your mistakes. We keep them.");
+  // The wordmark sits in the desk sidebar; the tagline is the page's h1.
+  await expect(page.getByRole("complementary", { name: "TraceIt" }).getByText("TraceIt", { exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Take notes as usual. TraceIt spots what didn’t click.");
+  await expect(page.getByTestId("tagline")).toHaveText("Take notes as usual. TraceIt spots what didn’t click.");
   await expect(page.getByTestId("new-session")).toBeVisible();
 });
 

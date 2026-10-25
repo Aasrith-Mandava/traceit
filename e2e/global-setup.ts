@@ -1,7 +1,8 @@
-// Warm up the dev server so the first test isn't charged for route compilation.
+// Warm up the dev server so the first test isn't charged for route compilation. Signed out, so the
+// pages redirect to /signin (compiling it too) and the APIs answer 401 — compiled either way.
 export default async function globalSetup() {
   const base = "http://localhost:3100";
-  for (const path of ["/app", "/api/sessions", "/api/lectures", "/lectures/new"]) {
+  for (const path of ["/signin", "/signup", "/app", "/classes", "/api/auth/me", "/api/sessions", "/api/lectures", "/lectures/new"]) {
     try {
       await fetch(base + path);
     } catch {

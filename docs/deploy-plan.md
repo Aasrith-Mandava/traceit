@@ -1,4 +1,4 @@
-# Inkling deploy plan
+# TraceIt deploy plan
 
 > **Superseded (2026-09-27):** the app is deployed on Railway (Dockerfile, SQLite on a `/data` volume, DEMO_MODE with an in-process periodic reset). Follow [`docs/railway.md`](railway.md). The blockers in section 5 (Whisper in DEMO_MODE, open uploads, reset, `sameOriginOnly` behind a proxy) are fixed in code. The research below is kept for reference.
 
@@ -20,7 +20,7 @@ Written 2026-09-26, the night before the deadline. This covers research only; no
   - The seeded Notability PDF lives on your laptop's disk.
   - You need a second Tiger service.
 - **Blockers that apply to both options.** Fix these whichever option you pick; section 5 has details.
-  1. **`DEMO_MODE` does not gate Whisper transcription.** `/api/ask` needs `GROQ_API_KEY`. With that key set, `POST /api/lectures/[id]/transcribe` would spend Groq credits. **Also set `INKLING_DISABLE_AI=1`.**
+  1. **`DEMO_MODE` does not gate Whisper transcription.** `/api/ask` needs `GROQ_API_KEY`. With that key set, `POST /api/lectures/[id]/transcribe` would spend Groq credits. **Also set `TRACEIT_DISABLE_AI=1`.**
   2. **Uploads are open to strangers.** A lecture can be up to 300 MB and a Notability PDF up to 50 MB. Uploaded lectures are listed for every visitor, and they can fill the disk. Disable uploads on the public deploy.
   3. **There is no auth.** Every visitor is the same student (`LOCAL_STUDENT_ID`), so anyone can draw into Maya's seeded sessions. Schedule a reset.
   4. **The merge must not add a `proxy.ts` whose matcher covers `/api/*`.** When a proxy exists, Next buffers request bodies to 10 MB (`proxyClientMaxBodySize`) and silently truncates anything larger.
@@ -33,12 +33,12 @@ Written 2026-09-26, the night before the deadline. This covers research only; no
 
 | Concern | Where | Behaviour |
 |---|---|---|
-| DB selection | `lib/db.ts:812-822` | `DATABASE_URL` set → Postgres (`lib/dbPostgres.ts`). Unset → SQLite at `INKLING_DB_PATH` (default `data/inkling.db`). |
+| DB selection | `lib/db.ts:812-822` | `DATABASE_URL` set → Postgres (`lib/dbPostgres.ts`). Unset → SQLite at `TRACEIT_DB_PATH` (default `data/traceit.db`). |
 | better-sqlite3 import | `lib/db.ts:3` (static import) | **Harmless when `DATABASE_URL` is set.** v13 loads the native addon lazily, inside the `Database` constructor (`node_modules/better-sqlite3/lib/binding.js`), and `SqliteDb` is only constructed when `DATABASE_URL` is unset. v13 also *ships* prebuilds for linux-x64/arm64 (glibc and musl), so it needs no compile step on Vercel or Ubuntu. |
 | SQLite dir creation | `lib/db.ts:170` `mkdirSync(dirname(file))` | Fails with EROFS on Vercel, because `/var/task` is read-only. |
 | ai_cache | `lib/dbPostgres.ts:389`, SQLite equivalent | **In the DB, not on disk.** Fine everywhere. |
-| TTS mp3 cache | `lib/ai/service.ts:121` (`INKLING_TTS_DIR`, default `data/tts`), writes at `:404-406` | On disk. **Never reached in DEMO_MODE**, because `lib/ai/tts.ts:39` returns no voice. |
-| Lecture uploads | `lib/storage.ts:15` (`INKLING_UPLOAD_DIR`, default `data/uploads`), `app/api/lectures/route.ts:39-115` (writes at `:89-94`) | On disk, up to 300 MB (`lib/upload.ts:5`). |
+| TTS mp3 cache | `lib/ai/service.ts:121` (`TRACEIT_TTS_DIR`, default `data/tts`), writes at `:404-406` | On disk. **Never reached in DEMO_MODE**, because `lib/ai/tts.ts:39` returns no voice. |
+| Lecture uploads | `lib/storage.ts:15` (`TRACEIT_UPLOAD_DIR`, default `data/uploads`), `app/api/lectures/route.ts:39-115` (writes at `:89-94`) | On disk, up to 300 MB (`lib/upload.ts:5`). |
 | Notability PDF import | `app/api/sessions/[id]/notability/route.ts:34`, writes at `:65-68` | On disk, up to 50 MB (`lib/notability.ts:6`). |
 | Seeded Notability PDF | `lib/demoSeed.ts:122-124` | `seed:demo` writes the PDF to the **local disk of the machine that runs the seed**. The DB row only stores its name. |
 | Media route | `app/api/lectures/[id]/media/route.ts:13-60` | Reads from disk via `resolveMediaPath` (`lib/storage.ts:34-41`). The demo file is `public/demo/lecture.wav` (2.9 MB, `lib/demo.ts:15`), resolved through `process.cwd()` with `turbopackIgnore`, **so file tracing cannot see it**. Range, 206 and ETag are implemented in the route itself. |
@@ -49,7 +49,7 @@ Written 2026-09-26, the night before the deadline. This covers research only; no
 
 These are exact code paths, as of `lib/ai/*` at the time of writing.
 
-**Provider selection.** `lib/ai/select.ts:51`: with `DEMO_MODE` truthy (`1|true|yes|on`), the mode is `'demo'` and the provider is `createFakeProvider()`. The fake provider is offline and deterministic (`lib/ai/fake.ts`). This check runs *before* `AI_PROVIDER` and `INKLING_DISABLE_AI`.
+**Provider selection.** `lib/ai/select.ts:51`: with `DEMO_MODE` truthy (`1|true|yes|on`), the mode is `'demo'` and the provider is `createFakeProvider()`. The fake provider is offline and deterministic (`lib/ai/fake.ts`). This check runs *before* `AI_PROVIDER` and `TRACEIT_DISABLE_AI`.
 
 **What DEMO_MODE covers, per AI call** (`lib/ai/service.ts`):
 
@@ -65,10 +65,10 @@ These are exact code paths, as of `lib/ai/*` at the time of writing.
 
 **What DEMO_MODE does not cover:**
 
-- **Whisper transcription.** `lib/transcribe.ts:40-41` only checks `INKLING_DISABLE_AI === "1"`, and `lib/lecture.ts:33-35` delegates to it. With `GROQ_API_KEY` or `OPENAI_API_KEY` present, the "Auto-transcribe" button (`components/TranscriptPanel.tsx:73`) calls the network. The About page (`app/about/page.tsx:102`) claims "no network requests", which is wrong in that case.
+- **Whisper transcription.** `lib/transcribe.ts:40-41` only checks `TRACEIT_DISABLE_AI === "1"`, and `lib/lecture.ts:33-35` delegates to it. With `GROQ_API_KEY` or `OPENAI_API_KEY` present, the "Auto-transcribe" button (`components/TranscriptPanel.tsx:73`) calls the network. The About page (`app/about/page.tsx:102`) claims "no network requests", which is wrong in that case.
 - **`/api/ask`** (the landing assistant) uses `GROQ_API_KEY` by design. It has its own caps (see section 5).
 
-**The `x-inkling-ai: off` header** (`lib/ai/service.ts:509-527`) can only turn AI *off*, and it is ignored when `NODE_ENV=production`. A visitor cannot use it to turn live AI on.
+**The `x-traceit-ai: off` header** (`lib/ai/service.ts:509-527`) can only turn AI *off*, and it is ignored when `NODE_ENV=production`. A visitor cannot use it to turn live AI on.
 
 **A brand-new visitor session in DEMO_MODE:**
 
@@ -103,10 +103,10 @@ The seed produces Maya's two sessions plus five classmates (`lib/demoScenario.ts
 |---|---|---|
 | A1 | **Demo audio 404s.** `public/` is served by the CDN and is not in the function bundle. The media route reads `public/demo/lecture.wav` from `process.cwd()` (`lib/storage.ts:12,37`), and `turbopackIgnore` hides the path from tracing. Result: no playback on the session and review pages. | Blocker |
 | A2 | **SQLite can't be used.** `/var/task` is read-only (`lib/db.ts:170`), and `/tmp` is per instance and ephemeral, so sessions would vanish or 404 across instances. **`DATABASE_URL` is required.** Once it is set, the SQLite import is harmless (addon loaded lazily). | Blocker (config) |
-| A3 | **Uploads fail.** Vercel Functions cap request bodies at **4.5 MB**, and the upload directory is read-only (`lib/storage.ts:15,22`, `app/api/lectures/route.ts:89`). `INKLING_UPLOAD_DIR=/tmp/...` would work only on one instance until it recycles. | Blocker for the upload feature; disable it |
+| A3 | **Uploads fail.** Vercel Functions cap request bodies at **4.5 MB**, and the upload directory is read-only (`lib/storage.ts:15,22`, `app/api/lectures/route.ts:89`). `TRACEIT_UPLOAD_DIR=/tmp/...` would work only on one instance until it recycles. | Blocker for the upload feature; disable it |
 | A4 | **The seeded Notability PDF 404s.** `seed:demo` run from your laptop writes the file to *your laptop* (`lib/demoSeed.ts:124`). `/api/sessions/demo-maya-1/notability/file` (`app/api/sessions/[id]/notability/file/route.ts:16-26`) then can't find it on Vercel, so the compare page loses the PDF pane. | Blocker for the compare page |
 | A5 | **Notability PDF import** (`app/api/sessions/[id]/notability/route.ts:34-68`): disk write plus a body that can exceed 4.5 MB. | Disable |
-| A6 | **The TTS disk cache** (`lib/ai/service.ts:121`) is never used in DEMO_MODE. Only relevant if you ever run live AI on Vercel; then set `INKLING_TTS_DIR=/tmp/inkling-tts`. | None in demo |
+| A6 | **The TTS disk cache** (`lib/ai/service.ts:121`) is never used in DEMO_MODE. Only relevant if you ever run live AI on Vercel; then set `TRACEIT_TTS_DIR=/tmp/traceit-tts`. | None in demo |
 | A7 | **Connection pool.** `lib/dbPostgres.ts:186-195` uses `max: 5` per instance, and every Fluid-compute instance keeps its own pool. Set `PG_POOL_MAX=2`. Use the **direct** Tiger endpoint, not its PgBouncer pooler: the pool sends `statement_timeout` as a startup parameter (`:192`), which transaction poolers often reject. Each cold start re-runs migrate plus the Timescale setup (`:540-575`). This is idempotent and takes an advisory lock, but adds some latency. | Config |
 | A8 | **Timeouts.** No route in DEMO_MODE is long-running: analyze, export and evaluation are CPU-only and take seconds. Vercel's default max duration with Fluid compute is well above that. Only live Whisper would be long, and it is disabled. No `maxDuration` is needed. | OK |
 | A9 | **Body limits.** The largest legitimate non-upload body is the strokes batch, `MAX_STROKES_BODY_BYTES` = 4 MB (`lib/autosave.ts:14`), which is under 4.5 MB. Read-revision is about 550 KB. | OK |
@@ -124,14 +124,14 @@ The seed produces Maya's two sessions plus five classmates (`lib/demoScenario.ts
    async headers() { return [{ source: "/:path*", headers: securityHeaders }]; }, // copy landing/next.config.ts:33-38
    ```
    Alternative: in `app/api/lectures/[id]/media/route.ts:16`, return `Response.redirect(new URL("/demo/lecture.wav", request.url), 307)` when `record.mediaPath === DEMO_MEDIA_PATH`. The CDN serves that file with Range support.
-2. **Disable uploads in public mode.** Add a helper such as `export const uploadsDisabled = () => truthy(process.env.DEMO_MODE) || process.env.INKLING_DISABLE_UPLOADS === "1"` and use it:
+2. **Disable uploads in public mode.** Add a helper such as `export const uploadsDisabled = () => truthy(process.env.DEMO_MODE) || process.env.TRACEIT_DISABLE_UPLOADS === "1"` and use it:
    - Return 403 at the top of `app/api/lectures/route.ts:39` (the POST).
    - Return 403 at the top of `app/api/sessions/[id]/notability/route.ts:34` (the POST).
    - Hide the "Add lecture" link (`app/page.tsx`, the `add-lecture` link; its line is shifting during the merge) and `app/lectures/new/page.tsx`, plus the Notability upload control on the compare page.
 3. **Serve the seeded Notability PDF without the laptop's disk.** Pick one:
    - (a) In `app/api/sessions/[id]/notability/file/route.ts:16-26`: when the file is missing and `id === DEMO_SESSIONS.s1.id`, render it on the fly with `renderFinalPagePdf(await db.getStrokes(id), { title: "Chain rule — Maya" })` (`lib/demoPdf.ts:22`). This is pure JS and works on serverless.
    - (b) Commit a fixed `public/demo/notability.pdf`, let `resolvePdfPath` (`lib/storage.ts:57-62`) accept it, and add it to `outputFileTracingIncludes` for that route.
-4. **Close the transcription hole in code.** In `lib/transcribe.ts:41`, change the check to `if (env.INKLING_DISABLE_AI === "1" || /^(1|true|yes|on)$/i.test(env.DEMO_MODE?.trim() ?? "")) return null;`. The env-only alternative is `INKLING_DISABLE_AI=1`.
+4. **Close the transcription hole in code.** In `lib/transcribe.ts:41`, change the check to `if (env.TRACEIT_DISABLE_AI === "1" || /^(1|true|yes|on)$/i.test(env.DEMO_MODE?.trim() ?? "")) return null;`. The env-only alternative is `TRACEIT_DISABLE_AI=1`.
 5. **Optional: fail loudly on Vercel without a DB.** In `lib/db.ts:815`, add `if (!url && process.env.VERCEL) throw new Error("DATABASE_URL is required on Vercel");`.
 6. **Optional: protect the seeded sessions.** In DEMO_MODE, return 403 for writes to `demo-maya-*` and `demo-classmate-*` IDs in `app/api/sessions/[id]/strokes/route.ts:9`. Otherwise, schedule a reseed (see section 5).
 7. **Optional: trim the bundle.** `outputFileTracingExcludes: { "/*": ["./node_modules/@electric-sql/pglite/**"] }`.
@@ -143,7 +143,7 @@ The seed produces Maya's two sessions plus five classmates (`lib/demoScenario.ts
 | `DATABASE_URL` | **The prod Tiger service**, `?sslmode=require` | Required (A2). Never the dev URL. |
 | `PG_POOL_MAX` | `2` | A7 |
 | `DEMO_MODE` | `1` | Fixtures only |
-| `INKLING_DISABLE_AI` | `1` | Kills Whisper transcription and server TTS. Demo fixtures still work, because `select.ts:51` checks DEMO_MODE first. Must be exactly `1` (`lib/transcribe.ts:41`). |
+| `TRACEIT_DISABLE_AI` | `1` | Kills Whisper transcription and server TTS. Demo fixtures still work, because `select.ts:51` checks DEMO_MODE first. Must be exactly `1` (`lib/transcribe.ts:41`). |
 | `GROQ_API_KEY` | your key | `/api/ask` only |
 | `LANDING_AI_DAILY_CAP` | e.g. `200` | Cost ceiling per instance |
 | `NEXT_PUBLIC_SITE_URL` | `https://<your>.tech` | OG URLs (`landing/app/layout.tsx:21`). Inlined at build time. |
@@ -158,16 +158,16 @@ Set everything in the Vercel dashboard (Project → Settings → Environment Var
   - It writes the Notability PDF to the local disk (A4).
   - `loadEnvConfig` runs in *production* mode (`scripts/seed-demo.ts:14`), so it reads `.env.production.local` **before** `.env.local`. Don't create a `.env.production.local` on your laptop that holds the prod URL, or every later seed will silently hit prod. Instead, put the URL in a file Next never auto-loads and source it for one command:
     ```bash
-    # ~/.inkling-prod.env (chmod 600) contains: DATABASE_URL=postgres://...prod...?sslmode=require
-    ( set -a; . ~/.inkling-prod.env; set +a; npm run seed:demo -- --reset )
+    # ~/.traceit-prod.env (chmod 600) contains: DATABASE_URL=postgres://...prod...?sslmode=require
+    ( set -a; . ~/.traceit-prod.env; set +a; npm run seed:demo -- --reset )
     ```
     Variables already in the shell win over env files, because `@next/env` never overrides existing values.
 - **Keep prod separate from dev.** Your laptop's `.env.local` has `DATABASE_URL` set, pointing at the Tiger service that holds your practice sessions.
   - All sessions share one student ID, and there is no auth. If prod pointed at the same database, strangers would see (and could draw into) your practice sessions, and your laptop would list theirs.
-  - **Preferred:** a second Tiger service (e.g. `inkling-prod`) with its own URL. Check the free-plan service count in the Tiger console.
+  - **Preferred:** a second Tiger service (e.g. `traceit-prod`) with its own URL. Check the free-plan service count in the Tiger console.
   - **Fallback: a schema in the same service.**
-    1. Run `CREATE SCHEMA inkling_prod;` once.
-    2. Append `&options=-c%20search_path%3Dinkling_prod%2Cpublic` to the URL. node-postgres passes `options` through as a startup parameter.
+    1. Run `CREATE SCHEMA traceit_prod;` once.
+    2. Append `&options=-c%20search_path%3Dtraceit_prod%2Cpublic` to the URL. node-postgres passes `options` through as a startup parameter.
     3. `public` must stay on the path, because the TimescaleDB functions (`time_bucket`, `create_hypertable`) live there.
     4. Check `/api/health` → `{ backend: "postgres", timescale: true }`.
   - Region: put Vercel functions in `iad1` (Washington DC) if the Tiger service is in AWS us-east-1.
@@ -184,7 +184,7 @@ Set everything in the Vercel dashboard (Project → Settings → Environment Var
 - Billing is hourly, so a weekend costs about $1. Destroy the instance afterwards, or keep it through judging.
 - Use the MLH Vultr credit link if your event provides one.
 - `next build` with Turbopack is memory-hungry. Use 2 GB, or 1 GB plus a 2 GB swap file.
-- Choose the **Atlanta (ATL)** region for the lowest latency at HackGT.
+- Choose the **Silicon Valley (SJC)** region for the lowest latency at CalHacks 13.0 (Berkeley).
 
 **Why no code changes are required:** persistent disk means SQLite, uploads, the seeded PDF and the demo WAV all work exactly as they do locally. A single process means the in-memory rate limits are exact. Still apply blockers 1–3 from section 5. Blocker 1 needs only env vars; blocker 2 is one guard or a Caddy body cap.
 
@@ -213,48 +213,48 @@ Set everything in the Vercel dashboard (Project → Settings → Environment Var
 5. **Code.** Do this after the merge is finished and builds locally.
    - The simplest route is **rsync from your laptop**. It needs no push, and `landing/` is untracked anyway.
      ```bash
-     # on the laptop, from /Users/pnagothu/hackgt13/inkling
+     # on the laptop, from the project folder
      rsync -az --delete \
        --exclude node_modules --exclude .next --exclude data --exclude landing \
        --exclude '.env*' --exclude test-results --exclude screenshots --exclude notability-screenshots \
-       ./ deploy@<IP>:/srv/inkling/
+       ./ deploy@<IP>:/srv/traceit/
      ```
      Excluding `landing/` also matters because the root `tsconfig.json` includes `**/*.ts`. A leftover `landing/` without its `node_modules` can break `next build`'s typecheck.
    - Alternatively, commit and push, then `git clone` (use a deploy key if the repo is private).
-   - Create `/srv/inkling` owned by `deploy` first: `sudo mkdir -p /srv/inkling && sudo chown deploy: /srv/inkling`.
+   - Create `/srv/traceit` owned by `deploy` first: `sudo mkdir -p /srv/traceit && sudo chown deploy: /srv/traceit`.
 
-6. **Environment.** As `deploy`, in `/srv/inkling`:
+6. **Environment.** As `deploy`, in `/srv/traceit`:
    ```bash
    umask 077 && nano .env.production.local
    ```
    ```dotenv
    DEMO_MODE=1
-   INKLING_DISABLE_AI=1
+   TRACEIT_DISABLE_AI=1
    GROQ_API_KEY=<paste>            # /api/ask only
    LANDING_AI_DAILY_CAP=200
    NEXT_PUBLIC_SITE_URL=https://<your>.tech
-   # no DATABASE_URL → SQLite at data/inkling.db
+   # no DATABASE_URL → SQLite at data/traceit.db
    # no OPENAI/GEMINI/XAI/ELEVENLABS keys
    ```
    **Never copy your laptop's `.env.local`.** It contains the dev `DATABASE_URL`, and the VPS would then write into your Tiger dev service.
 
 7. **Install, build, seed:**
    ```bash
-   cd /srv/inkling
+   cd /srv/traceit
    npm ci                      # dev deps are needed: tsx (seed), tailwind/typescript (build)
    npm run build               # NEXT_PUBLIC_SITE_URL must be present now (build-time inline)
    npm run seed:demo -- --reset
    ```
 
-8. **Process manager. Option 8a: systemd** (no global installs). Create `/etc/systemd/system/inkling.service`:
+8. **Process manager. Option 8a: systemd** (no global installs). Create `/etc/systemd/system/traceit.service`:
    ```ini
    [Unit]
-   Description=Inkling (Next.js)
+   Description=TraceIt (Next.js)
    After=network.target
 
    [Service]
    User=deploy
-   WorkingDirectory=/srv/inkling
+   WorkingDirectory=/srv/traceit
    Environment=NODE_ENV=production
    ExecStart=/usr/bin/node node_modules/next/dist/bin/next start -H 127.0.0.1 -p 3000
    Restart=always
@@ -264,14 +264,14 @@ Set everything in the Vercel dashboard (Project → Settings → Environment Var
    WantedBy=multi-user.target
    ```
    ```bash
-   sudo systemctl daemon-reload && sudo systemctl enable --now inkling
-   journalctl -u inkling -f
+   sudo systemctl daemon-reload && sudo systemctl enable --now traceit
+   journalctl -u traceit -f
    ```
 
    **Option 8b: pm2.** Install it on the server only:
    ```bash
    sudo npm i -g pm2
-   pm2 start node_modules/next/dist/bin/next --name inkling -- start -H 127.0.0.1 -p 3000
+   pm2 start node_modules/next/dist/bin/next --name traceit -- start -H 127.0.0.1 -p 3000
    pm2 save && pm2 startup   # run the printed sudo command
    ```
 
@@ -318,16 +318,16 @@ Set everything in the Vercel dashboard (Project → Settings → Environment Var
 11. **Scheduled reset.** Run `crontab -e` as `deploy`:
     ```cron
     # every 30 min: rebuild Maya + classmates (visitor sessions stay)
-    */30 * * * * cd /srv/inkling && npm run seed:demo -- --reset >> /home/deploy/seed.log 2>&1
+    */30 * * * * cd /srv/traceit && npm run seed:demo -- --reset >> /home/deploy/seed.log 2>&1
     # 04:00 daily: wipe visitor sessions too
-    0 4 * * * sudo systemctl stop inkling && cd /srv/inkling && rm -f data/inkling.db data/inkling.db-wal data/inkling.db-shm && rm -rf data/uploads && npm run seed:demo && sudo systemctl start inkling >> /home/deploy/seed.log 2>&1
+    0 4 * * * sudo systemctl stop traceit && cd /srv/traceit && rm -f data/traceit.db data/traceit.db-wal data/traceit.db-shm && rm -rf data/uploads && npm run seed:demo && sudo systemctl start traceit >> /home/deploy/seed.log 2>&1
     ```
-    The second line needs passwordless sudo for `systemctl stop/start inkling`, via a sudoers drop-in. SQLite's WAL mode lets the seed run while the app is up.
+    The second line needs passwordless sudo for `systemctl stop/start traceit`, via a sudoers drop-in. SQLite's WAL mode lets the seed run while the app is up.
 
 12. **Redeploy loop:**
     ```bash
     rsync ...                   # the same command as step 5
-    ssh deploy@<IP> 'cd /srv/inkling && npm ci && npm run build && sudo systemctl restart inkling'
+    ssh deploy@<IP> 'cd /srv/traceit && npm ci && npm run build && sudo systemctl restart traceit'
     ```
 
 **Variant B′.** For the Tiger Data prize on the public site, point the VPS at a separate prod Tiger service by adding `DATABASE_URL` to `.env.production.local`. Everything else stays the same. SQLite has fewer moving parts, and your laptop already demonstrates Tiger live.
@@ -387,7 +387,7 @@ Check with `dig +short <your>.tech` before starting Caddy. Caddy retries anyway,
    - Nothing about storage, media Range, the seeded PDF or native modules changes.
 2. **Mandatory work is env-only:**
    - `DEMO_MODE=1`
-   - `INKLING_DISABLE_AI=1`
+   - `TRACEIT_DISABLE_AI=1`
    - no dev `DATABASE_URL`
    - a Caddy body cap of 5 MB, which also shuts off lecture and PDF uploads without code (they fail with 413)
 3. **It adds the Vultr prize,** with automatic HTTPS and an exact single-process rate limiter.
@@ -409,7 +409,7 @@ Keep the laptop for live AI: `npm run dev` with your normal `.env.local`, which 
 
 ### Cost and abuse
 
-- [ ] `DEMO_MODE=1` **and** `INKLING_DISABLE_AI=1` on the public host. Then check both of these:
+- [ ] `DEMO_MODE=1` **and** `TRACEIT_DISABLE_AI=1` on the public host. Then check both of these:
   - `/about` shows "Demo fixtures (DEMO_MODE, offline)".
   - `POST /api/lectures/<id>/transcribe` returns 503 "AI not configured".
 - [ ] Only `GROQ_API_KEY` is present on the public host, for `/api/ask`. No OpenAI, Gemini, xAI or ElevenLabs keys.
@@ -464,7 +464,7 @@ Keep the laptop for live AI: `npm run dev` with your normal `.env.local`, which 
 
 - [ ] The root `tsconfig.json` includes `**/*.ts`. After the merge, delete `landing/` or add `"landing"` to `exclude`, so its sources aren't typechecked without its `node_modules`.
 - [ ] The merged deps are in the root `package.json`. The diff shows `framer-motion`, `motion`, `clsx`, `tailwind-merge` and `@paper-design/shaders-react` added, and `pdf-lib` moved to `dependencies`.
-- [ ] The 12.8 MB `inkling-demo.mp4` moves into `public/`. It is served statically: Vercel's CDN supports Range, and so does Next's `public` serving on the VPS. Keep the poster image and the `.vtt` alongside it.
+- [ ] The 12.8 MB `traceit-demo.mp4` moves into `public/`. It is served statically: Vercel's CDN supports Range, and so does Next's `public` serving on the VPS. Keep the poster image and the `.vtt` alongside it.
 - [ ] Set `NEXT_PUBLIC_SITE_URL` *before* `next build`.
 - [ ] Run `npm run build && npm run demo` locally, then `npx playwright test e2e/demo.spec.ts`, before shipping.
 - [ ] On the live host, check `/api/health` shows the expected backend, `/about` shows DEMO_MODE, the audio scrubs, the compare page shows the PDF, and `/welcome` → `/app` navigation works.

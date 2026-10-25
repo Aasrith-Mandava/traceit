@@ -12,8 +12,8 @@ import type { EraseEvent, Stroke, TimelineEvent } from '../types';
 // Integration: help cards, check-answer explanations, read aloud and the session recap in the
 // student's language, over a throwaway SQLite file. The provider is the deterministic fake (or
 // spies around it); fetch is always a mock — never the network.
-const dir = mkdtempSync(join(tmpdir(), 'inkling-i18n-'));
-process.env.INKLING_DB_PATH = join(dir, 'test.db');
+const dir = mkdtempSync(join(tmpdir(), 'traceit-i18n-'));
+process.env.TRACEIT_DB_PATH = join(dir, 'test.db');
 
 let db: ReturnType<typeof import('../db')['getDb']>;
 let analyze: typeof import('../analyze');

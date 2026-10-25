@@ -7,17 +7,28 @@ export const MOMENT_META: Record<
   { label: string; legend: string; plural: [one: string, many: string]; color: string }
 > = {
   // `color` mirrors the --color-* tokens in app/(product)/globals.css (canvas drawing needs literal colours).
-  misconception_corrected: {
-    label: "Corrected misconception",
-    legend: "Corrected",
-    plural: ["corrected", "corrected"],
-    color: "#0284c7",
-  },
-  unresolved_gap: { label: "Unresolved gap", legend: "Unresolved gap", plural: ["gap", "gaps"], color: "#d97706" },
-  breakthrough: { label: "Breakthrough", legend: "Breakthrough", plural: ["breakthrough", "breakthroughs"], color: "#1e293b" },
+  misconception_corrected: { label: "Fixed", legend: "Fixed", plural: ["fixed", "fixed"], color: "#0e9f6e" },
+  unresolved_gap: { label: "Still fuzzy", legend: "Still fuzzy", plural: ["still fuzzy", "still fuzzy"], color: "#f08c00" },
+  breakthrough: { label: "Aha moment", legend: "Aha moment", plural: ["aha moment", "aha moments"], color: "#e0338a" },
 };
 
 export const MOMENT_ORDER: TimelineEventType[] = ["misconception_corrected", "unresolved_gap", "breakthrough"];
+
+/** Study mode's reading order group: open "still fuzzy" first, then fixed, then aha moments, then cleared gaps. */
+function importance(e: Pick<TimelineEvent, "type" | "status">): number {
+  if (e.type === "unresolved_gap") return e.status === "open" ? 0 : 3;
+  return e.type === "misconception_corrected" ? 1 : 2;
+}
+
+/**
+ * The guided review's order ("by importance"): open gaps, then corrections, then breakthroughs, then
+ * gaps already cleared; by lecture time within each group. Returns a new array.
+ */
+export function momentsByImportance<T extends Pick<TimelineEvent, "id" | "type" | "status" | "lectureMs">>(events: T[]): T[] {
+  return [...events].sort(
+    (a, b) => importance(a) - importance(b) || a.lectureMs - b.lectureMs || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
+  );
+}
 
 /** The scoring window an event belongs to (the one it was linked to, else the one containing it). */
 export function windowFor(event: TimelineEvent, windows: ConfusionWindow[]): ConfusionWindow | undefined {

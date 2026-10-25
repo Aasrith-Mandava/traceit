@@ -1,5 +1,4 @@
 import { describe, expect, it, vi } from 'vitest';
-import { aiLabel } from '../about';
 import { buildChatRequest, createCompatProvider, type CompatConfig } from '../ai/compat';
 import {
   DEFAULT_GROQ_MODEL,
@@ -266,17 +265,16 @@ describe('provider selection with Groq', () => {
     expect(selectProvider({ GROQ_API_KEY: KEY }).provider?.name).toBe('groq');
   });
 
-  it('DEMO_MODE, fake and INKLING_DISABLE_AI are unchanged by a Groq key', () => {
+  it('DEMO_MODE, fake and TRACEIT_DISABLE_AI are unchanged by a Groq key', () => {
     expect(selectProvider({ DEMO_MODE: '1', GROQ_API_KEY: KEY }).mode).toBe('demo');
     expect(selectProvider({ AI_PROVIDER: 'fake', GROQ_API_KEY: KEY }).provider?.name).toBe('fake');
-    expect(selectProvider({ INKLING_DISABLE_AI: '1', GROQ_API_KEY: KEY }).mode).toBe('off');
+    expect(selectProvider({ TRACEIT_DISABLE_AI: '1', GROQ_API_KEY: KEY }).mode).toBe('off');
   });
 
-  it('status and /about show Groq and its model (never the key)', () => {
+  it('status shows Groq and its model (never the key)', () => {
     const status = aiStatusFrom(selectProvider({ GROQ_API_KEY: KEY, GROQ_MODEL: 'openai/gpt-oss-20b' }));
     expect(status).toEqual({ enabled: true, mode: 'live', provider: 'groq', model: 'openai/gpt-oss-20b' });
     expect(JSON.stringify(status)).not.toContain(KEY);
-    expect(aiLabel(status)).toBe('Groq · openai/gpt-oss-20b');
   });
 
   it('with AI_PROVIDER=groq and another key, readRevision falls back to that provider when Groq vision is off', async () => {

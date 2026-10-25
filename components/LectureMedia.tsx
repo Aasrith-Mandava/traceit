@@ -51,7 +51,7 @@ export default function LectureMedia({
       <div
         role="alert"
         data-testid="media-error"
-        className="fixed right-4 bottom-4 z-40 max-w-sm rounded-md border border-danger/30 bg-chrome px-3.5 py-2.5 text-sm text-pretty text-danger shadow-raised"
+        className="fixed right-4 bottom-4 z-40 max-w-sm rounded-md border border-danger/25 bg-chrome px-4 py-3 text-sm text-pretty text-danger shadow-lift"
       >
         <span className="font-semibold">Couldn’t load this lecture’s {mediaType === "audio" ? "audio" : "video"}.</span>
         {loadError ? <span className="text-ink-muted"> {loadError}</span> : null}
@@ -71,7 +71,7 @@ export default function LectureMedia({
     <div data-testid="video-panel" data-collapsed={collapsed ? "true" : "false"} className={className}>
       {banner}
       <div
-        className={`group relative w-[min(18rem,42vw)] overflow-hidden rounded-lg bg-ink shadow-page outline outline-1 -outline-offset-1 outline-black/10 ${
+        className={`group relative w-[min(18rem,42vw)] overflow-hidden rounded-md bg-night shadow-lift outline outline-1 -outline-offset-1 outline-white/10 ${
           collapsed ? "hidden" : "enter-soft"
         }`}
       >
@@ -82,7 +82,7 @@ export default function LectureMedia({
           playsInline
           aria-label={`Lecture video: ${title}`}
           data-testid="lecture-media"
-          className="block aspect-video w-full bg-ink object-contain"
+          className="block aspect-video w-full bg-night object-contain"
         />
         <button
           type="button"
@@ -92,7 +92,7 @@ export default function LectureMedia({
           title="Hide video"
           className="press absolute top-0 right-0 inline-flex size-11 items-center justify-center"
         >
-          <span className="inline-flex size-7 items-center justify-center rounded-pill bg-black/55 text-white transition-colors hover:bg-black/75">
+          <span className="inline-flex size-7 items-center justify-center rounded-pill bg-night/65 text-white transition-colors hover:bg-night/90">
             <MinimizeIcon size={14} />
           </span>
         </button>
@@ -102,9 +102,9 @@ export default function LectureMedia({
           type="button"
           data-testid="video-expand"
           onClick={() => setCollapsed(false)}
-          className="press inline-flex min-h-11 items-center gap-2 rounded-pill border border-line bg-chrome px-3.5 text-sm font-medium text-ink shadow-raised hover:bg-chrome-hover"
+          className="press inline-flex min-h-11 items-center gap-2 rounded-pill border border-line bg-chrome px-3.5 text-sm font-bold text-ink shadow-raised hover:border-accent-line hover:text-accent-strong"
         >
-          <VideoIcon size={16} />
+          <VideoIcon size={16} className="text-accent" />
           Show video
         </button>
       ) : null}

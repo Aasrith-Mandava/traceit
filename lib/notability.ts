@@ -101,7 +101,7 @@ export function describePdfError(err: unknown): { kind: PdfErrorKind; message: s
         message: 'This PDF couldn’t be read — it may be damaged or incomplete. Try exporting it from Notability again.',
       };
     case 'ResponseException':
-      return { kind: 'missing', message: 'Couldn’t load the PDF from Inkling. Reload the page to try again.' };
+      return { kind: 'missing', message: 'Couldn’t load the PDF from TraceIt. Reload the page to try again.' };
     default:
       return { kind: 'unknown', message: 'Something went wrong showing this PDF. Try uploading it again.' };
   }

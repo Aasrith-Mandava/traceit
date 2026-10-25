@@ -6,9 +6,9 @@ import type { Lecture, Session } from '../types';
 
 // The Live lecture routes end to end on a throwaway SQLite file + upload folder: create, cue
 // batches, the recording upload, same-origin and body limits, and DEMO_MODE's 403.
-const dir = mkdtempSync(join(tmpdir(), 'inkling-live-'));
-process.env.INKLING_DB_PATH = join(dir, 'test.db');
-process.env.INKLING_UPLOAD_DIR = join(dir, 'uploads');
+const dir = mkdtempSync(join(tmpdir(), 'traceit-live-'));
+process.env.TRACEIT_DB_PATH = join(dir, 'test.db');
+process.env.TRACEIT_UPLOAD_DIR = join(dir, 'uploads');
 // DATABASE_URL comes from the vitest project: '' (SQLite) or pglite:memory (the postgres project).
 
 type Routes = {
@@ -18,6 +18,9 @@ type Routes = {
 };
 let r: Routes;
 let getLecture: typeof import('../lecture')['getLecture'];
+/** Every request is signed in as one student (the routes need an account). */
+let cookie = '';
+let userId = '';
 
 beforeAll(async () => {
   r = {
@@ -26,6 +29,11 @@ beforeAll(async () => {
     recording: await import('../../app/api/lectures/[id]/recording/route'),
   };
   ({ getLecture } = await import('../lecture'));
+  const { getDb } = await import('../db');
+  const { signedInCookie } = await import('./authHelpers');
+  const signedIn = await signedInCookie(getDb());
+  ({ cookie } = signedIn);
+  userId = signedIn.user.id;
 });
 
 afterEach(() => {
@@ -43,7 +51,7 @@ function post(path: string, body: BodyInit | null, headers: Record<string, strin
   return new Request(`http://${HOST}${path}`, {
     method: 'POST',
     body,
-    headers: { host: HOST, ...headers },
+    headers: { host: HOST, cookie, ...headers },
     // Node needs this for a streamed body; harmless otherwise.
     ...(body instanceof ReadableStream ? { duplex: 'half' } : {}),
   } as RequestInit);
@@ -96,7 +104,7 @@ describe('POST /api/lectures/live', () => {
     process.env.DEMO_MODE = '1';
     const res = await r.create.POST(json('/api/lectures/live', { title: 'x' }));
     expect(res.status).toBe(403);
-    expect(await res.json()).toEqual({ error: 'Live lecture is available when you run Inkling yourself.' });
+    expect(await res.json()).toEqual({ error: 'Live lecture is available when you run TraceIt yourself.' });
   });
 });
 
@@ -128,12 +136,30 @@ describe('POST /api/lectures/[id]/cues', () => {
     expect((await r.cues.POST(json(path, { cues: 'x' }), ctx(lecture.id))).status).toBe(400);
     expect((await r.cues.POST(post(path, 'x'.repeat(300 * 1024)), ctx(lecture.id))).status).toBe(413);
     expect((await r.cues.POST(json('/api/lectures/l_missing/cues', { cues: [] }), ctx('l_missing'))).status).toBe(404);
-    // The demo lecture is not a Live lecture.
+    // The demo lecture has no owner: only an owner adds cues, so it is "not found".
     const demo = await r.cues.POST(
       json('/api/lectures/demo-chain-rule/cues', { cues: [{ startMs: 0, endMs: 10, text: 'x' }] }),
       ctx('demo-chain-rule'),
     );
-    expect(demo.status).toBe(409);
+    expect(demo.status).toBe(404);
+    // The user's own uploaded (not Live) lecture.
+    const { getDb } = await import('../db');
+    const uploaded = await getDb().createLecture({
+      ownerId: userId,
+      title: 'Uploaded',
+      courseId: 'general',
+      mediaPath: '',
+      mediaType: 'audio',
+      mime: 'audio/wav',
+      durationMs: 1000,
+      words: [],
+      transcriptSource: 'none',
+    });
+    const notLive = await r.cues.POST(
+      json(`/api/lectures/${uploaded.id}/cues`, { cues: [{ startMs: 0, endMs: 10, text: 'x' }] }),
+      ctx(uploaded.id),
+    );
+    expect(notLive.status).toBe(409);
     expect((await r.cues.POST(json(path, { cues: [] }, { origin: 'http://evil.example' }), ctx(lecture.id))).status).toBe(403);
   });
 

@@ -1,31 +1,17 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono, Instrument_Serif } from "next/font/google";
+import { fontVariables } from "@/lib/fonts";
+import { NavTracker } from "@/components/BackLink";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
-
-// Display serif used only for the wordmark and page titles.
-const instrumentSerif = Instrument_Serif({
-  variable: "--font-instrument-serif",
-  weight: "400",
-  subsets: ["latin"],
-});
-
 export const metadata: Metadata = {
-  title: "Inkling",
+  title: "TraceIt",
+  // The TraceIt symbol as a crisp SVG tab icon (app/favicon.ico stays as the fallback).
+  icons: { icon: "/icon.svg" },
   description: "Every other app deletes your mistakes. We keep them.",
 };
 
 export const viewport: Viewport = {
-  themeColor: "#fbfbf8",
+  themeColor: "#f3f2fb",
   colorScheme: "light",
   width: "device-width",
   initialScale: 1,
@@ -37,9 +23,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} ${instrumentSerif.variable} h-full antialiased`}
+      className={`${fontVariables} h-full antialiased`}
     >
-      <body className="flex min-h-full flex-col text-ink">{children}</body>
+      <body className="flex min-h-full flex-col text-ink">
+        {/* Remembers the pages this tab shows, so the toolbars' "Back" returns to the right one. */}
+        <NavTracker />
+        {children}
+      </body>
     </html>
   );
 }

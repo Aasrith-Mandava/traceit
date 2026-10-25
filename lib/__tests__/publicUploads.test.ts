@@ -7,15 +7,17 @@ import type { Lecture } from '../types';
 // POST /api/lectures in DEMO_MODE with and without PUBLIC_UPLOADS (the opt-in public upload
 // switch): 403 when off; when on, accepted with a smaller cap, per-IP and daily rate limits, and
 // auto-transcribe still refused. On a throwaway SQLite file + upload folder.
-const dir = mkdtempSync(join(tmpdir(), 'inkling-public-upload-'));
-process.env.INKLING_DB_PATH = join(dir, 'test.db');
-process.env.INKLING_UPLOAD_DIR = join(dir, 'uploads');
+const dir = mkdtempSync(join(tmpdir(), 'traceit-public-upload-'));
+process.env.TRACEIT_DB_PATH = join(dir, 'test.db');
+process.env.TRACEIT_UPLOAD_DIR = join(dir, 'uploads');
 
 let upload: typeof import('../../app/api/lectures/route');
 let transcribe: typeof import('../../app/api/lectures/[id]/transcribe/route');
 let limits: typeof import('../publicUploads');
 let demoMode: typeof import('../demoMode');
 let getLecture: typeof import('../lecture')['getLecture'];
+/** Uploads need an account: every request is signed in as one student. */
+let cookie = '';
 
 const ENV_KEYS = ['DEMO_MODE', 'PUBLIC_UPLOADS', 'PUBLIC_UPLOAD_MAX_MB', 'PUBLIC_UPLOAD_DAILY_CAP'] as const;
 
@@ -25,6 +27,9 @@ beforeAll(async () => {
   limits = await import('../publicUploads');
   demoMode = await import('../demoMode');
   ({ getLecture } = await import('../lecture'));
+  const { getDb } = await import('../db');
+  const { signedInCookie } = await import('./authHelpers');
+  ({ cookie } = await signedInCookie(getDb()));
 });
 
 beforeEach(() => limits.resetPublicUploadLimits());
@@ -59,6 +64,7 @@ async function uploadRequest(
     body,
     headers: {
       host: HOST,
+      cookie,
       origin: `http://${HOST}`,
       'content-type': encoded.headers.get('content-type')!,
       'content-length': String(opts.contentLength ?? body.byteLength),
@@ -143,7 +149,7 @@ describe('POST /api/lectures in DEMO_MODE', () => {
     const res = await transcribe.POST(
       new Request(`http://${HOST}/api/lectures/${lecture.id}/transcribe`, {
         method: 'POST',
-        headers: { host: HOST, origin: `http://${HOST}` },
+        headers: { host: HOST, cookie, origin: `http://${HOST}` },
       }),
       { params: Promise.resolve({ id: lecture.id }) },
     );

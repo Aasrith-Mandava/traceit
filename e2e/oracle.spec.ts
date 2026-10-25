@@ -38,7 +38,7 @@ test("signal lab: chart with a spike, tooltip reasons, and the spike opens its r
   await expect(page.getByTestId("signal-strip")).toHaveCount(4);
   await expect(page.getByTestId("signal-baseline").first()).toBeAttached();
   await expect(page.getByTestId("signal-event-marker")).toHaveCount(analysis.events.length);
-  await expect(page.getByTestId("signal-legend")).toContainText("How Inkling decides you were stuck");
+  await expect(page.getByTestId("signal-legend")).toContainText("How TraceIt decides you were stuck");
 
   const spikes = page.getByTestId("signal-spike");
   expect(await spikes.count()).toBeGreaterThanOrEqual(1);
@@ -73,19 +73,25 @@ test("signal lab: chart with a spike, tooltip reasons, and the spike opens its r
   await expect(page.getByTestId("moment-detail")).toHaveAttribute("data-type", "unresolved_gap");
 });
 
-test("progress and about link to the Signal Lab and the model evaluation", async ({ page, request }) => {
+test("the Signal Lab and the model evaluation are demo pages: reachable by URL, not linked from the student app", async ({ page, request }) => {
   const { sessionId } = await seedMaya(request, "Maya — links");
+  // My progress and My notes no longer link to either page.
   await page.goto("/progress");
-  const link = page.locator(`[data-testid="progress-signal-lab"][data-session-id="${sessionId}"]`);
-  await expect(link).toBeVisible();
-  await link.click();
-  await page.waitForURL(new RegExp(`/insights/${sessionId}$`));
-  await expect(page.getByTestId("signal-lab")).toBeVisible();
+  await expect(page.getByTestId("progress-page")).toBeVisible();
+  await expect(page.locator(`[data-testid="progress-thread"]`).first()).toBeVisible();
+  await expect(page.getByTestId("progress-signal-lab")).toHaveCount(0);
+  await expect(page.locator('a[href^="/insights"]')).toHaveCount(0);
+  await page.goto("/app");
+  await expect(page.getByTestId("session-list")).toBeVisible();
+  await expect(page.locator('a[href^="/insights"]')).toHaveCount(0);
 
-  await page.goto("/about");
-  await page.getByTestId("about-evaluation").click();
-  await page.waitForURL(/\/insights\/evaluation$/);
+  // Both still open by URL, kept out of search engines.
+  await page.goto(`/insights/${sessionId}`);
+  await expect(page.getByTestId("signal-lab")).toBeVisible();
+  await expect(page.locator('meta[name="robots"]')).toHaveAttribute("content", "noindex, nofollow");
+  await page.goto("/insights/evaluation");
   await expect(page.getByTestId("evaluation")).toBeVisible();
+  await expect(page.locator('meta[name="robots"]')).toHaveAttribute("content", "noindex, nofollow");
 });
 
 test("model evaluation: numeric precision / recall on the labeled demo set, per-label matches, sweep", async ({ page, request }) => {

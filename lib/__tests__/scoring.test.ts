@@ -1,5 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { SCORING_CONFIG, baselineRange, baselineZones, mad, median, percentile, robustZ, scoreSession } from '../scoring';
+import {
+  SCORING_CONFIG,
+  baselineRange,
+  baselineZones,
+  mad,
+  median,
+  percentile,
+  robustZ,
+  scoreSession,
+  writingBelowBaseline,
+} from '../scoring';
 import type { BBox, ConfusionWindow, EraseEvent, Point, Stroke, TranscriptWord } from '../types';
 
 let counter = 0;
@@ -500,5 +510,35 @@ describe('baselineZones (the hatched Baseline on the review timeline)', () => {
     const windows = scoreSession({ sessionId: 'sess-1', strokes: [], eraseEvents: [], words: [], durationMs: 300_000 });
     const legacy = windows.map((w) => ({ ...w, phase: undefined }));
     expect(baselineZones(legacy, 300_000)).toEqual([{ startMs: 0, endMs: 120_000 }]);
+  });
+});
+
+describe('writingBelowBaseline (an empty trail after too little writing)', () => {
+  /** One short stroke in each of `n` consecutive 10 s windows, from `fromMs`. */
+  const inWindows = (n: number, fromMs = 0) =>
+    Array.from({ length: n }, (_, i) => mkStroke({ startMs: fromMs + i * 10_000 + 1000, endMs: fromMs + i * 10_000 + 2000 }));
+  const baselineWindows = (strokes: Stroke[]) =>
+    scoreSession({ sessionId: 's', strokes, eraseEvents: [], words: [], durationMs: 360_000 }).filter((w) => w.phase === 'baseline').length;
+
+  it('is true without any ink, and while fewer than 12 windows (2 minutes) hold writing', () => {
+    expect(writingBelowBaseline([])).toBe(true);
+    expect(writingBelowBaseline(inWindows(11))).toBe(true);
+    expect(writingBelowBaseline(inWindows(12))).toBe(false);
+    expect(writingBelowBaseline(inWindows(12, 200_000))).toBe(false); // started mid-lecture
+  });
+
+  it('agrees with the baseline scoreSession measures', () => {
+    for (const n of [1, 6, 11, 12, 20]) {
+      expect(writingBelowBaseline(inWindows(n))).toBe(baselineWindows(inWindows(n)) < 12);
+    }
+  });
+
+  it('counts every window a long stroke touches, and never strokes taken back with undo', () => {
+    expect(writingBelowBaseline([mkStroke({ startMs: 0, endMs: 125_000 })])).toBe(false);
+    const undone = inWindows(12).map((s, i) => (i < 2 ? { ...s, erased: true, erasedBy: 'undo' as const, erasedAtMs: s.endMs } : s));
+    expect(writingBelowBaseline(undone)).toBe(true);
+    // Rubbed-out ink (ghosts) was still written: it counts.
+    const ghosts = inWindows(12).map((s, i) => (i < 2 ? { ...s, erased: true, erasedBy: 'eraser' as const, erasedAtMs: s.endMs } : s));
+    expect(writingBelowBaseline(ghosts)).toBe(false);
   });
 });

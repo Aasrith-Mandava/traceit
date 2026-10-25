@@ -14,12 +14,17 @@ interface LecturePlayerProps {
   mediaRef: RefObject<HTMLMediaElement | null>;
   /** Buttons shown after the clock (e.g. the transcript toggle). */
   actions?: ReactNode;
-  /** Optional quiet status shown at the end of the tape. */
+  /** Optional quiet status shown at the end of the band. */
   aside?: ReactNode;
+  /** Show the "Press ▶" hint while the lecture is paused (hidden while it plays). */
+  hint?: boolean;
 }
 
-/** The slim lecture bar: play/pause, progress and clock for the shared media element. */
-export default function LecturePlayer({ title, durationMs, mediaRef, actions, aside }: LecturePlayerProps) {
+/**
+ * The dark lecture band under the toolbar: lime play/pause, progress and clock for the shared media
+ * element, then the caller's actions (Captions) and aside (hesitation chip, ink counts).
+ */
+export default function LecturePlayer({ title, durationMs, mediaRef, actions, aside, hint = false }: LecturePlayerProps) {
   const [playing, setPlaying] = useState(false);
   const [timeMs, setTimeMs] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -71,11 +76,12 @@ export default function LecturePlayer({ title, durationMs, mediaRef, actions, as
   };
 
   const progress = durationMs > 0 ? Math.min(1, timeMs / durationMs) : 0;
+  const showHint = hint && !playing;
 
   return (
     <section
       aria-label="Lecture"
-      className="flex min-h-[var(--tape-h)] shrink-0 items-center gap-3 border-b border-line bg-desk px-2 sm:px-3"
+      className="flex min-h-[var(--tape-h)] shrink-0 flex-wrap items-center gap-x-3 gap-y-2 bg-night px-3 py-2.5 text-white sm:gap-x-5 sm:px-6"
     >
       <button
         type="button"
@@ -83,27 +89,45 @@ export default function LecturePlayer({ title, durationMs, mediaRef, actions, as
         data-state={playing ? "playing" : "paused"}
         onClick={toggle}
         aria-label={playing ? "Pause lecture" : "Play lecture"}
-        className="press group inline-flex size-11 shrink-0 items-center justify-center rounded-pill"
+        aria-describedby={showHint ? "play-hint" : undefined}
+        className="press inline-flex size-11 shrink-0 items-center justify-center rounded-pill bg-highlight text-on-highlight hover:bg-highlight-strong"
       >
-        <span className="inline-flex size-8 items-center justify-center rounded-pill bg-ink text-paper transition-colors group-hover:bg-accent">
-          {playing ? <PauseIcon size={14} /> : <PlayIcon size={14} className="translate-x-px" />}
-        </span>
+        {playing ? <PauseIcon size={16} /> : <PlayIcon size={16} className="translate-x-px" />}
       </button>
-      <div className="flex min-w-0 flex-1 items-center gap-3">
-        <span className="hidden max-w-[16rem] truncate text-sm font-medium text-ink-muted md:block">{title}</span>
-        <div aria-hidden="true" className="relative h-[3px] min-w-12 flex-1 overflow-hidden rounded-pill bg-line">
+      <span className="hidden max-w-[16rem] truncate text-sm font-semibold text-night-text md:block">{title}</span>
+      <div className="relative flex min-w-[9rem] flex-1 items-center gap-3">
+        {/* While paused: "Press ▶" laid over the start of the (still) progress bar — and over the
+            clock on narrow phones — so the band never changes height and the page never moves. */}
+        {showHint ? (
+          <p
+            id="play-hint"
+            data-testid="play-hint"
+            className="enter-soft pointer-events-none absolute -inset-y-1.5 -left-3 z-[1] flex max-w-[calc(100%+0.75rem)] items-center bg-night pr-3 pl-3 text-[13px] leading-tight font-semibold text-pretty text-highlight"
+          >
+            <span>
+              Press <span aria-hidden="true">▶</span>
+              <span className="sr-only"> play</span> — your notes are timed to the lecture.
+            </span>
+          </p>
+        ) : null}
+        {/* Progress: indigo → lime fill and a white thumb (decorative; the clock says the same). */}
+        <div aria-hidden="true" className="relative h-1.5 min-w-12 flex-1 rounded-pill bg-night-line">
           <div
-            className="absolute inset-0 origin-left rounded-pill bg-accent"
+            className="absolute inset-0 origin-left rounded-pill bg-linear-to-r from-accent-light to-highlight"
             style={{ transform: `scaleX(${progress})` }}
           />
+          <span
+            className="absolute top-1/2 size-3.5 -translate-x-1/2 -translate-y-1/2 rounded-pill bg-white shadow-[0_0_0_4px_rgb(217_249_157/0.25)]"
+            style={{ left: `${progress * 100}%` }}
+          />
         </div>
-        <div className="shrink-0 font-mono text-sm tabular-nums text-ink">
+        <div className="shrink-0 font-mono text-[13px] tabular-nums text-white">
           <span data-testid="lecture-time">{formatClock(timeMs)}</span>
-          <span className="text-ink-subtle"> / {formatClock(durationMs)}</span>
+          <span className="text-night-text/70"> / {formatClock(durationMs)}</span>
         </div>
       </div>
       {error ? (
-        <span role="alert" className="max-w-[12rem] truncate text-sm text-danger" title={error}>
+        <span role="alert" className="max-w-[12rem] truncate text-sm font-medium text-red-300" title={error}>
           {error}
         </span>
       ) : null}

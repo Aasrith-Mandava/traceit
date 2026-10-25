@@ -1,4 +1,6 @@
 import { writeFile, unlink } from "node:fs/promises";
+import { ownedSession } from "@/lib/access";
+import { withUser } from "@/lib/auth/core";
 import { getDb } from "@/lib/db";
 import { PDF_DEMO_MESSAGE, demoForbidden, isDemoMode } from "@/lib/demoMode";
 import { sameOriginOnly } from "@/lib/http";
@@ -17,13 +19,12 @@ import { pdfUploadTarget } from "@/lib/storage";
 const fail = (status: number, error: string) => Response.json({ error }, { status });
 
 /** The session's current Notability import (metadata only), or null. */
-export async function GET(_request: Request, ctx: RouteContext<"/api/sessions/[id]/notability">) {
+export const GET = withUser(async (_request, user, ctx: RouteContext<"/api/sessions/[id]/notability">) => {
   const { id } = await ctx.params;
-  const db = getDb();
-  if (!(await db.getSession(id))) return fail(404, "session not found");
-  const record = await db.getNotabilityImport(id);
+  if (!(await ownedSession(user, id))) return fail(404, "session not found");
+  const record = await getDb().getNotabilityImport(id);
   return Response.json({ import: record?.import ?? null });
-}
+});
 
 /**
  * Upload a Notability PDF export for a session: multipart/form-data with `file`. Replacing an
@@ -34,7 +35,7 @@ export async function GET(_request: Request, ctx: RouteContext<"/api/sessions/[i
  *
  * Disabled in DEMO_MODE (403, before the body is read): a public demo never stores uploads.
  */
-export const POST = sameOriginOnly(async (request: Request, ctx: RouteContext<"/api/sessions/[id]/notability">) => {
+export const POST = sameOriginOnly(withUser(async (request, user, ctx: RouteContext<"/api/sessions/[id]/notability">) => {
   if (isDemoMode(process.env)) return demoForbidden(PDF_DEMO_MESSAGE);
   const lengthHeader = request.headers.get("content-length");
   const length = lengthHeader === null ? NaN : Number(lengthHeader);
@@ -45,8 +46,8 @@ export const POST = sameOriginOnly(async (request: Request, ctx: RouteContext<"/
   }
 
   const { id } = await ctx.params;
+  if (!(await ownedSession(user, id))) return fail(404, "session not found");
   const db = getDb();
-  if (!(await db.getSession(id))) return fail(404, "session not found");
 
   let form: FormData;
   try {
@@ -86,4 +87,4 @@ export const POST = sameOriginOnly(async (request: Request, ctx: RouteContext<"/
     console.error("notability upload failed", err instanceof Error ? err.message : err);
     return fail(500, "Could not save the PDF.");
   }
-});
+}));

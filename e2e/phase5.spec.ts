@@ -19,7 +19,7 @@ const WRONG = "Stop after the outer derivative";
 const WAV = readFileSync("public/demo/lecture.wav");
 const DEMO_WORDS = JSON.parse(readFileSync("public/demo/lecture.transcript.json", "utf8")) as TranscriptWord[];
 const VTT = Buffer.from(captionsFromWords(DEMO_WORDS));
-const AI_OFF = { "x-inkling-ai": "off" };
+const AI_OFF = { "x-traceit-ai": "off" };
 const PNG = `data:image/png;base64,${Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13]).toString("base64")}`;
 
 async function uploadLecture(request: APIRequestContext, title: string): Promise<Lecture> {
@@ -56,8 +56,13 @@ async function seeded(request: APIRequestContext, title: string) {
 
 const marker = (page: Page, eventId: string) => page.locator(`[data-testid="timeline-marker"][data-event-id="${eventId}"]`);
 
+/**
+ * Opens a moment from its marker. Study mode opens the most important one (here the open gap) by
+ * itself on arrival — its marker is already pressed, and a click would close it.
+ */
 async function openMoment(page: Page, eventId: string) {
-  await marker(page, eventId).click();
+  const m = marker(page, eventId);
+  if ((await m.getAttribute("aria-pressed")) !== "true") await m.click();
   await expect(page.getByTestId("moment-detail")).toHaveAttribute("data-event-id", eventId);
 }
 
@@ -114,7 +119,7 @@ test("(a) corrected moment → help card → right answer is a Breakthrough that
   await answer(page, RIGHT);
   const feedback = page.getByTestId("check-feedback");
   await expect(feedback).toHaveAttribute("data-result", "correct");
-  await expect(feedback).toContainText("Breakthrough!");
+  await expect(feedback).toContainText("Aha moment!");
   await expect(page.getByTestId("moment-detail")).toHaveAttribute("data-type", "breakthrough");
   await expect(marker(page, corrected.id)).toHaveAttribute("data-type", "breakthrough");
   await expect(page.getByTestId("count-breakthroughs")).toHaveText("1");
@@ -132,15 +137,17 @@ test("(a) corrected moment → help card → right answer is a Breakthrough that
   await expect(marker(page, corrected.id)).toHaveAttribute("data-type", "breakthrough");
   await expect(page.getByTestId("count-breakthroughs")).toHaveText("1");
   await openMoment(page, corrected.id);
-  await expect(page.getByTestId("check-feedback")).toContainText("Breakthrough!");
+  await expect(page.getByTestId("check-feedback")).toContainText("Aha moment!");
   await expect(page.getByTestId("check-submit")).toHaveCount(0);
 });
 
 test("(b) gap: a wrong answer keeps it open with the why; the right one resolves it by check", async ({ page, request }) => {
   const { lecture, sessionId, gap } = await seeded(request, "Phase 5 — gap check");
   await page.goto(`/review/${sessionId}`);
+  // The open gap is the most important moment: it is already open.
+  await expect(marker(page, gap.id)).toHaveAttribute("aria-pressed", "true");
   await openMoment(page, gap.id);
-  await expect(page.getByTestId("moment-status")).toHaveText("Open");
+  await expect(page.getByTestId("moment-status")).toHaveText("Still fuzzy");
   await expect(page.getByTestId("check-option")).toHaveCount(4);
 
   await answer(page, WRONG);
@@ -148,7 +155,7 @@ test("(b) gap: a wrong answer keeps it open with the why; the right one resolves
   await expect(feedback).toHaveAttribute("data-result", "wrong");
   await expect(page.getByTestId("check-why")).toContainText("multiplied by the derivative of the inside");
   await expect(page.getByTestId("check-option").filter({ hasText: WRONG })).toHaveAttribute("data-state", "wrong");
-  await expect(page.getByTestId("moment-status")).toHaveText("Open");
+  await expect(page.getByTestId("moment-status")).toHaveText("Still fuzzy");
   await expect(marker(page, gap.id)).toHaveAttribute("data-status", "open");
   const afterWrong = (await storedEvent(request, sessionId, gap.id)).event;
   expect(afterWrong).toMatchObject({ status: "open" });
@@ -157,8 +164,8 @@ test("(b) gap: a wrong answer keeps it open with the why; the right one resolves
   // Retry.
   await answer(page, RIGHT);
   await expect(feedback).toHaveAttribute("data-result", "correct");
-  await expect(feedback).toContainText("gap resolved");
-  await expect(page.getByTestId("moment-status")).toHaveText("Resolved");
+  await expect(feedback).toContainText("that’s cleared up");
+  await expect(page.getByTestId("moment-status")).toHaveText("Cleared");
   await expect(marker(page, gap.id)).toHaveAttribute("data-status", "resolved");
   expect((await storedEvent(request, sessionId, gap.id)).event).toMatchObject({ status: "resolved", resolvedBy: "check" });
 
@@ -168,17 +175,48 @@ test("(b) gap: a wrong answer keeps it open with the why; the right one resolves
   await page.goto("/progress?status=resolved");
   const thread = page.locator(`[data-testid="progress-lecture"][data-lecture-id="${lecture.id}"]`).getByTestId("progress-thread");
   await expect(thread).toHaveAttribute("data-resolved-by", "check");
-  await expect(thread.getByTestId("progress-thread-resolved")).toContainText("Check question");
+  await expect(thread.getByTestId("progress-thread-resolved")).toContainText("Self-test");
 });
 
-test("(c) a correction's revision is read: “What you changed” and the likely mix-up", async ({ page, request }) => {
+test("guided review: arrow keys in the self-test pick answers; elsewhere in the panel they move between moments", async ({ page, request }) => {
+  const { sessionId, corrected, gap } = await seeded(request, "Phase 5 — arrows");
+  await page.goto(`/review/${sessionId}`);
+  await openMoment(page, gap.id);
+  const position = page.getByTestId("moment-position");
+  await expect(position).toHaveText("Moment 1 of 2");
+
+  // Inside the radio group the arrows choose an answer; the moment stays put.
+  const radios = page.getByRole("radio");
+  await expect(radios).toHaveCount(4);
+  await radios.first().focus();
+  await page.keyboard.press("Space");
+  await expect(radios.first()).toBeChecked();
+  await page.keyboard.press("ArrowRight");
+  await expect(radios.nth(1)).toBeChecked();
+  await expect(radios.nth(1)).toBeFocused();
+  await page.keyboard.press("ArrowLeft");
+  await expect(radios.first()).toBeChecked();
+  await expect(page.getByTestId("moment-detail")).toHaveAttribute("data-event-id", gap.id);
+  await expect(position).toHaveText("Moment 1 of 2");
+
+  // On the panel's heading they move to the next / previous moment.
+  await page.getByTestId("moment-title").focus();
+  await page.keyboard.press("ArrowRight");
+  await expect(page.getByTestId("moment-detail")).toHaveAttribute("data-event-id", corrected.id);
+  await expect(position).toHaveText("Moment 2 of 2");
+  await expect(page.getByTestId("moment-title")).toBeFocused();
+  await page.keyboard.press("ArrowLeft");
+  await expect(page.getByTestId("moment-detail")).toHaveAttribute("data-event-id", gap.id);
+});
+
+test("(c) a correction's revision is read: “Your edit” and the likely mistake", async ({ page, request }) => {
   const { sessionId, corrected } = await seeded(request, "Phase 5 — revision reading");
   await page.goto(`/review/${sessionId}`);
   const reading = page.waitForResponse((r) => r.url().includes("/read-revision") && r.request().method() === "POST");
   await openMoment(page, corrected.id);
   expect((await reading).status()).toBe(200);
   const view = page.getByTestId("revision-reading");
-  await expect(view).toContainText("What you changed:");
+  await expect(view).toContainText("Your edit:");
   await expect(page.getByTestId("revision-before")).toContainText("a first attempt at this step");
   await expect(page.getByTestId("revision-after")).toContainText("a rewritten version");
   await expect(page.getByTestId("revision-misconception")).toContainText("Mixed up a step");
@@ -192,7 +230,7 @@ test("(c) a correction's revision is read: “What you changed” and the likely
   });
   await page.reload();
   await openMoment(page, corrected.id);
-  await expect(page.getByTestId("revision-reading")).toContainText("What you changed:");
+  await expect(page.getByTestId("revision-reading")).toContainText("Your edit:");
   expect(posted).toBe(0);
 });
 
@@ -264,7 +302,7 @@ test("(d) Read aloud: no server voice → the browser voice speaks right in the 
   expect(ttsRequests).toBe(0);
 });
 
-test("(d2) Read aloud: speech that never starts → an error hint within ~1 s, not a stuck “Stop reading”", async ({ page, request }) => {
+test("(d2) Read aloud: speech that never starts → an error hint within ~1 s, not a stuck “Stop”", async ({ page, request }) => {
   await stubSpeech(page, "silent");
   const { sessionId, gap } = await seeded(request, "Phase 5 — read aloud watchdog");
   await page.goto(`/review/${sessionId}`);
@@ -277,7 +315,7 @@ test("(d2) Read aloud: speech that never starts → an error hint within ~1 s, n
   await expect(button).toHaveAttribute("data-state", "error", { timeout: 1_500 });
   expect(Date.now() - clickedAt).toBeLessThan(1_500);
   await expect(page.getByTestId("read-aloud-hint")).toHaveText("Voice unavailable on this device.");
-  await expect(button).toHaveText("Read aloud");
+  await expect(button).toHaveText("Read it to me");
   await expect(button).toHaveAttribute("aria-pressed", "false");
   const after = await spoken(page);
   expect(after.spoken).toHaveLength(1);
@@ -366,7 +404,7 @@ test.describe("(f) without an AI key", () => {
     await openMoment(page, gap.id);
     await expect(page.getByTestId("help-nokey")).toBeVisible();
     await page.getByTestId("self-resolve").click();
-    await expect(page.getByTestId("moment-status")).toHaveText("Resolved");
+    await expect(page.getByTestId("moment-status")).toHaveText("Cleared");
     expect(aiCalls).toBe(0);
 
     const res = await request.post(`/api/events/${encodeURIComponent(gap.id)}/help`);

@@ -70,20 +70,20 @@ test("the stroke counter counts lines drawn, on the capture bar and on the home 
   const { sessionId, box } = await newSession(page);
   await drawStraight(page, box, 100, 150, 500);
   await drawStraight(page, box, 100, 250, 500);
-  await expect(page.getByTestId("stroke-counter")).toHaveText("2 strokes");
+  await expect(page.getByTestId("stroke-counter")).toHaveText("2 pen strokes");
   await rub(page, box, 270, 330, 150);
   // Cut into 3 pieces, but still 2 lines drawn.
   await expect(canvas(page)).toHaveAttribute("data-stroke-count", "4");
   await expect(canvas(page)).toHaveAttribute("data-drawn-count", "2");
-  await expect(page.getByTestId("stroke-counter")).toHaveText("2 strokes · 1 erased part");
+  await expect(page.getByTestId("stroke-counter")).toHaveText("2 pen strokes · 1 ghost");
 
   await saved(page, sessionId);
   await page.goto("/app");
   const count = page.locator(`a[href="/session/${sessionId}"] [data-testid="session-stroke-count"]`);
   await expect(count).toHaveAttribute("data-drawn", "2");
   await expect(count).toHaveAttribute("data-erased-parts", "1");
-  await expect(count).toContainText("2 strokes");
-  await expect(count).toContainText("1 erased part");
+  await expect(count).toContainText("2 pen strokes");
+  await expect(count).toContainText("1 ghost saved");
 });
 
 test("toolbar Undo right after the eraser brings the erased part back, and it stays back", async ({ page }) => {
@@ -97,7 +97,7 @@ test("toolbar Undo right after the eraser brings the erased part back, and it st
   await expect(canvas(page)).toHaveAttribute("data-erased-part-count", "0");
   await expect(canvas(page)).toHaveAttribute("data-drawn-count", "1");
   await expect(canvas(page)).toHaveAttribute("data-visible-count", "3");
-  await expect(page.getByTestId("stroke-counter")).toHaveText("1 stroke");
+  await expect(page.getByTestId("stroke-counter")).toHaveText("1 pen stroke");
   await expect.poll(() => inkAt(page, 300, 200, 20, 5)).toBeGreaterThan(5);
 
   // Persisted: the pieces are live ink again, and an 'undo' event records it.
@@ -134,7 +134,7 @@ test("a straight line through a word, then new writing nearby, erases the word (
   await expect(toast).toContainText("Struck through — kept as ghost");
   await expect(canvas(page)).toHaveAttribute("data-erased-part-count", "1");
   await expect(canvas(page)).toHaveAttribute("data-drawn-count", "5");
-  await expect(page.getByTestId("stroke-counter")).toHaveText("5 strokes · 1 erased part");
+  await expect(page.getByTestId("stroke-counter")).toHaveText("5 pen strokes · 1 ghost");
 
   let data = await saved(page, sessionId);
   const struck = data.strokes.filter((s) => s.erasedBy === "strike");

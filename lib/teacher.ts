@@ -1,19 +1,21 @@
 import "server-only";
 
 // "Where did the class get lost?" — the teacher view of one lecture (/teacher/[lectureId], GET
-// /api/lectures/[id]/class). Privacy first: every student's sessions of the lecture are reduced to
-// anonymous writing signals (when they hesitated, when they erased), aggregated per 30 s of lecture,
-// and only then shown. No names, ids or ink leave this module; a head count below CLASS_K is never
-// shown (k-anonymity), and a class smaller than CLASS_K gets no view at all.
+// /api/lectures/[id]/class), for the teacher of the lecture's class only. Privacy first: the sessions
+// of the students enrolled in that class are reduced to anonymous writing signals
+// (when they hesitated, when they erased), aggregated per 30 s of lecture, and only then shown.
+// No names, ids or ink leave this module; a head count below CLASS_K is never shown (k-anonymity),
+// and a class smaller than CLASS_K gets no view at all.
 //
 // The erasing row of the heatmap is Db.lectureInkHotspots — on Tiger Data a TimescaleDB continuous
 // aggregate. The "students who struggled" row and the re-teach picks are computed here in TS.
 // Client components import only types from this module.
+import { taughtLecture } from "./access";
 import { analysisDurationMs } from "./analyze";
 import { HOTSPOT_BUCKET_MS, getDb, type InkHotspot } from "./db";
 import { hotspotBars, hotspotSourceLabel } from "./hotspots";
 import { isReversedErase, scoreSession } from "./scoring";
-import type { ConfusionWindow, EraseEvent, LectureMediaType, Stroke, TranscriptWord } from "./types";
+import type { ConfusionWindow, EraseEvent, LectureMediaType, Stroke, TranscriptWord, User } from "./types";
 
 /** Smallest group whose size is ever shown (k-anonymity). */
 export const CLASS_K = 3;
@@ -198,20 +200,28 @@ export function buildClassView(input: {
 }
 
 /**
- * Loads every session of the lecture, reduces each student to anonymous signals and builds the view.
- * Stored, up-to-date analyses are reused; other sessions (e.g. classmates never opened on this
- * device) are scored in memory with the app's own engine — nothing is written. null = unknown lecture.
+ * Loads the sessions of the lecture written by the students enrolled in its class, reduces each
+ * student to anonymous signals and builds the view. Only the class's teacher gets a report: null
+ * when the lecture is unknown, not in a class, or in someone else's class. Stored, up-to-date
+ * analyses are reused; other sessions are scored in memory with the app's own engine — nothing is
+ * written.
  */
-export async function loadClassReport(lectureId: string): Promise<ClassReport | null> {
+export async function loadClassReport(lectureId: string, teacher: User): Promise<ClassReport | null> {
+  const found = await taughtLecture(teacher, lectureId);
+  if (!found) return null;
   const db = getDb();
-  const record = await db.getLecture(lectureId);
-  if (!record) return null;
-  const { lecture, words } = record;
-  const [sessions, hotspots, info] = await Promise.all([db.listSessions(), db.lectureInkHotspots(lectureId), db.info()]);
+  const { lecture, words } = found.record;
+  // Enrolled students only: the teacher's own notes and anyone outside the class never count.
+  const studentIds = await db.listClassStudentIds(found.cls.id);
+  const [sessions, hotspots, info] = await Promise.all([
+    db.listLectureSessions(lectureId, studentIds),
+    db.lectureInkHotspots(lectureId, studentIds),
+    db.info(),
+  ]);
   const hasTranscript = lecture.transcriptSource !== "none" && words.length > 0;
 
   const byStudent = new Map<string, StudentSignals>();
-  for (const session of sessions.filter((s) => s.lectureId === lectureId)) {
+  for (const session of sessions) {
     const [strokes, eraseEvents, stored] = await Promise.all([
       db.getStrokes(session.id),
       db.getEraseEvents(session.id),

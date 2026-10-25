@@ -89,7 +89,7 @@ function ExportSteps() {
     <ol aria-label="How to export from Notability" className="flex flex-wrap items-center justify-center gap-1.5 text-sm text-ink-muted">
       {steps.map((s, i) => (
         <li key={s} className="inline-flex items-center gap-1.5">
-          <span className="rounded-pill border border-line bg-chrome px-2.5 py-0.5 font-medium text-ink shadow-[0_1px_2px_rgb(15_23_42/0.04)]">{s}</span>
+          <span className="rounded-pill border border-line bg-chrome px-3 py-0.5 font-semibold text-ink">{s}</span>
           {i < steps.length - 1 ? <span aria-hidden="true" className="text-ink-subtle">→</span> : null}
         </li>
       ))}
@@ -124,15 +124,15 @@ export function NotabilityDropzone({
 
   return (
     <section aria-labelledby={headingId} className="mx-auto flex w-full max-w-md flex-col items-center gap-5 px-4 py-8 text-center">
-      <span aria-hidden="true" className="inline-flex size-12 items-center justify-center rounded-lg border border-teal-200 bg-accent-soft text-accent-press shadow-raised">
+      <span aria-hidden="true" className="inline-flex size-12 items-center justify-center rounded-[14px] border border-accent-line bg-accent-soft text-accent-strong">
         <DocumentIcon size={24} />
       </span>
       <div className="flex flex-col gap-1.5">
-        <h3 id={headingId} className="text-xl font-extrabold tracking-tight text-balance text-ink">
+        <h3 id={headingId} className="font-display text-xl font-extrabold text-balance text-ink">
           {title}
         </h3>
         {children ?? (
-          <p className="text-sm text-pretty text-ink-muted">
+          <p className="text-[15px] text-pretty text-ink-muted">
             Notability keeps the final page. Upload its PDF export to see, right next to it, everything that page hides.
           </p>
         )}
@@ -148,12 +148,12 @@ export function NotabilityDropzone({
         data-testid="notability-dropzone"
         data-over={over ? "true" : "false"}
         data-available={available ? "true" : "false"}
-        className={`flex w-full flex-col items-center gap-3 rounded-lg border border-dashed px-5 py-6 transition-[background-color,border-color,box-shadow] duration-150 focus-within:shadow-[var(--focus-ring)] ${
+        className={`flex w-full flex-col items-center gap-3 rounded-[20px] border-2 border-dashed px-5 py-6 transition-[background-color,border-color,box-shadow] duration-150 focus-within:shadow-[var(--focus-ring)] ${
           !available
             ? "cursor-not-allowed border-line-strong bg-paper opacity-70"
             : over
               ? "cursor-pointer border-accent bg-accent-soft"
-              : "cursor-pointer border-line-strong bg-paper hover:border-ink-subtle hover:bg-chrome"
+              : "cursor-pointer border-line-strong bg-paper hover:border-accent-light hover:bg-accent-tint"
         } ${busy ? "pointer-events-none opacity-70" : ""}`}
       >
         <span className={`${btnPrimary} pointer-events-none`} aria-hidden="true">
@@ -182,7 +182,7 @@ export function NotabilityDropzone({
       <UploadError state={state} />
 
       <div className="flex flex-col items-center gap-2">
-        <p className="text-xs font-bold tracking-wide text-ink-muted uppercase">In Notability</p>
+        <p className="kicker">In Notability</p>
         <ExportSteps />
         <p className="text-xs text-pretty text-ink-subtle">Open the note, then save the PDF to Files and pick it here.</p>
       </div>

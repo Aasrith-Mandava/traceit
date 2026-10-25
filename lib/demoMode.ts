@@ -9,9 +9,9 @@ export function isDemoMode(env: Env): boolean {
   return /^(1|true|yes|on)$/i.test(env.DEMO_MODE?.trim() ?? "");
 }
 
-export const UPLOAD_DEMO_MESSAGE = "Adding a lecture is available when you run Inkling yourself.";
-export const PDF_DEMO_MESSAGE = "Importing a Notability PDF is available when you run Inkling yourself.";
-export const TRANSCRIBE_DEMO_MESSAGE = "Auto-transcribe is available when you run Inkling yourself.";
+export const UPLOAD_DEMO_MESSAGE = "Adding a lecture is available when you run TraceIt yourself.";
+export const PDF_DEMO_MESSAGE = "Importing a Notability PDF is available when you run TraceIt yourself.";
+export const TRANSCRIBE_DEMO_MESSAGE = "Auto-transcribe is available when you run TraceIt yourself.";
 
 /** The 403 a route answers in DEMO_MODE (same shape as every other route error). */
 export const demoForbidden = (message: string) => Response.json({ error: message }, { status: 403 });

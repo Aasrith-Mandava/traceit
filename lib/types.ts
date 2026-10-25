@@ -1,4 +1,4 @@
-// Shared contract for Inkling. All times are lecture-clock milliseconds unless named *Iso.
+// Shared contract for TraceIt. All times are lecture-clock milliseconds unless named *Iso.
 
 export type PointerKind = 'pen' | 'mouse' | 'touch';
 export type Tool = 'pen' | 'eraser';
@@ -44,6 +44,11 @@ export interface Stroke {
    * history but is no longer drawn or analysed — its pieces are. See activeStrokes() in ./ink.
    */
   replacedBy?: string[] | null;
+  /**
+   * Pen size the stroke was drawn with: a multiplier on the base line width (lib/toolSizes; Fine
+   * 0.6, Bold 2). Absent = 1 = Medium, as every stroke was drawn before pen sizes existed.
+   */
+  size?: number;
 }
 
 /**
@@ -90,7 +95,38 @@ export interface Lecture {
    * instead of playing media. Absent for every other lecture, and once the recording is uploaded.
    */
   live?: true;
+  /** The class this lecture was added to (teachers only); absent for personal and bundled lectures. */
+  classId?: string;
+  /** That class's name (set together with classId). */
+  className?: string;
 }
+
+/** Accounts: a teacher is a student who can also create classes. */
+export type Role = 'student' | 'teacher';
+
+/** A signed-in person (client-safe: never carries the password hash). */
+export interface User {
+  id: string;
+  email: string;
+  name: string;
+  role: Role;
+  /** A shared demo account (no password; DEMO_MODE's "Try the demo"). */
+  guest: boolean;
+  createdAtIso: string;
+}
+
+/** A teacher's class; students join it with `joinCode`. */
+export interface ClassInfo {
+  id: string;
+  name: string;
+  teacherId: string;
+  teacherName: string;
+  joinCode: string;
+  createdAtIso: string;
+}
+
+/** A class as its teacher lists it. */
+export type TeacherClass = ClassInfo & { studentCount: number; lectureCount: number };
 
 /**
  * A Notability PDF export uploaded for a session (client-safe: the stored file name stays on the

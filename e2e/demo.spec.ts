@@ -1,9 +1,12 @@
 import { expect, test, type Page } from "@playwright/test";
+import { DEMO_BASE, SIGNED_OUT } from "./accounts";
 
 // Phase 8 — demo-proof. The whole two-minute demo against the production build (`npm run demo`:
 // next start, DEMO_MODE=1) on a freshly seeded database (`npm run seed:demo -- --reset`), with every
 // non-localhost request blocked. Nothing may try to reach the network, and nothing may log an error.
 // Screenshots of each stop land in screenshots/demo-*.png.
+// Signed in as the shared guest Maya (the project's storage state: "Try the demo"); the last tests
+// start signed out, as a visitor does.
 
 test.use({ viewport: { width: 1180, height: 820 } });
 
@@ -48,7 +51,7 @@ test("the two-minute demo runs end to end, offline, with no errors", async ({ pa
   await expect(rows).toHaveCount(2);
   await expect(rows.nth(0)).toContainText("Maya — Session 2");
   await expect(rows.nth(1)).toContainText("Maya — Session 1");
-  await expect(page.locator(`a[href="/session/${S1}"] [data-testid="session-stroke-count"]`)).toContainText(/\d+ strokes/);
+  await expect(page.locator(`a[href="/session/${S1}"] [data-testid="session-stroke-count"]`)).toContainText(/\d+ pen strokes/);
   await expect(page.getByTestId("open-gaps-count")).toHaveText("0");
   await shot(page, "demo-01-home");
 
@@ -60,10 +63,12 @@ test("the two-minute demo runs end to end, offline, with no errors", async ({ pa
   await expect(page.getByTestId("count-corrected")).toHaveText("1");
   await expect(page.getByTestId("count-gaps")).toHaveText("1");
 
-  // 3. The correction: before/after, the AI reading, the help card — then the right answer.
-  await marker(page, "misconception_corrected").click();
+  // 3. Study mode opens the most important moment by itself — the correction (the gap was cleared in
+  // Session 2): before/after, the AI reading, the help card — then the right answer.
   const detail = page.getByTestId("moment-detail");
+  await expect(marker(page, "misconception_corrected")).toHaveAttribute("aria-pressed", "true");
   await expect(detail).toHaveAttribute("data-type", "misconception_corrected");
+  await expect(page.getByTestId("moment-position")).toHaveText("Moment 1 of 3");
   await expect(page.getByTestId("moment-time")).toHaveText("01:40");
   await expect(page.getByTestId("before-canvas")).toBeVisible();
   await expect(page.getByTestId("after-canvas")).toBeVisible();
@@ -80,7 +85,7 @@ test("the two-minute demo runs end to end, offline, with no errors", async ({ pa
   await page.getByTestId("check-option").filter({ hasText: "2x cos(x^2)" }).click();
   await page.getByTestId("check-submit").click();
   await expect(page.getByTestId("check-feedback")).toHaveAttribute("data-result", "correct");
-  await expect(page.getByTestId("check-feedback")).toContainText("Breakthrough!");
+  await expect(page.getByTestId("check-feedback")).toContainText("Aha moment!");
   await expect(detail).toHaveAttribute("data-type", "breakthrough");
   await expect(page.getByTestId("count-breakthroughs")).toHaveText("2");
   await expect(page.getByTestId("count-corrected")).toHaveText("0");
@@ -90,11 +95,11 @@ test("the two-minute demo runs end to end, offline, with no errors", async ({ pa
   // 4. The gap: resolved later, in Session 2. Replay 20 s plays the lecture at that moment.
   await marker(page, "unresolved_gap").click();
   await expect(detail).toHaveAttribute("data-type", "unresolved_gap");
-  await expect(page.getByTestId("moment-status")).toContainText("Resolved");
+  await expect(page.getByTestId("moment-status")).toContainText("Cleared");
   await expect(page.getByTestId("moment-history")).toContainText(/resolved/i);
   await expect(page.getByTestId("help-source")).toHaveAttribute("data-source", "demo");
   const replay = page.getByTestId("replay");
-  await expect(replay).toHaveText("Replay 20s");
+  await expect(replay).toHaveText("Play this part");
   await replay.click();
   await expect(replay).toHaveAttribute("data-replay-state", "playing");
   await page.waitForTimeout(1200);
@@ -103,9 +108,13 @@ test("the two-minute demo runs end to end, offline, with no errors", async ({ pa
   await replay.click();
   await expect(replay).not.toHaveAttribute("data-replay-state", "playing");
 
-  // 5. Compare with Notability: the exported final page vs the process it hides.
-  await page.getByTestId("compare-link").click();
-  await page.waitForURL(new RegExp(`/compare/${S1}$`));
+  // 5. Study mode's "Download PDF" is the export; Compare with Notability (the exported final page vs
+  // the process it hides) is a demo page, opened by URL.
+  await expect(page.getByTestId("download-pdf")).toHaveAttribute("href", `/api/sessions/${S1}/export`);
+  const exported = await page.request.get(`/api/sessions/${S1}/export`);
+  expect(exported.status()).toBe(200);
+  expect(exported.headers()["content-type"]).toBe("application/pdf");
+  await page.goto(`/compare/${S1}`);
   await expect(page.getByTestId("notability-pdf-canvas")).toBeVisible();
   await expect(page.getByTestId("hidden-breakthroughs")).toHaveText("2");
   await expect(page.getByTestId("hidden-gaps")).toHaveText("1");
@@ -126,7 +135,7 @@ test("the two-minute demo runs end to end, offline, with no errors", async ({ pa
     .toBeGreaterThan(500);
   await shot(page, "demo-06-compare-overlay");
 
-  // 6. Progress: the gap resolved in Session 2 by writing it through; class hotspots from the DB.
+  // 6. Progress: the gap resolved in Session 2 by writing it through; Maya's own hotspots from the DB.
   await page.goto("/progress");
   const thread = page.getByTestId("progress-thread");
   await expect(thread).toHaveCount(1);
@@ -135,7 +144,7 @@ test("the two-minute demo runs end to end, offline, with no errors", async ({ pa
   await expect(page.getByTestId("progress-thread-label")).toHaveText("Chain versus product rule");
   const hotspots = page.getByTestId("hotspots");
   await expect(hotspots).toBeVisible();
-  await expect(hotspots).toContainText("Where the class slowed down");
+  await expect(hotspots).toContainText("Where you slowed down");
   const peak = Number(await hotspots.getAttribute("data-peak-ms"));
   expect([90_000, 240_000, 330_000]).toContain(peak);
   await shot(page, "demo-07-progress-hotspots");
@@ -152,18 +161,19 @@ test("the two-minute demo runs end to end, offline, with no errors", async ({ pa
     (a as HTMLAudioElement).currentTime = 264;
   });
   await expect(meter).toHaveAttribute("data-state", "stuck");
-  await expect(meter).toHaveAttribute("aria-valuetext", /Hesitating.*slower/);
+  await expect(meter).toHaveAttribute("aria-valuetext", /Thinking hard.*slower/);
   await shot(page, "demo-08-capture-meter");
 
-  // 8. About: backend, AI mode, voice and the lecture note — no secrets.
+  // 8. /about (the old "How it works" page) leads to My notes, which no longer has an "About this app"
+  // footer. The health check still says which backend is live — and never a secret.
   await page.goto("/about");
-  await expect(page.getByTestId("about-backend")).toHaveAttribute("data-backend", /^(sqlite|postgres)$/);
-  await expect(page.getByTestId("about-ai")).toHaveAttribute("data-mode", "demo");
-  await expect(page.getByTestId("about-mode")).toHaveAttribute("data-demo", "true");
-  await expect(page.getByTestId("about-voice")).toHaveAttribute("data-kind", "browser");
-  await expect(page.getByTestId("about-attribution").first()).toHaveAttribute("data-kind", "demo");
-  await expect(page.getByTestId("about-page")).not.toContainText(/sk-|postgres:\/\/|api_key/i);
-  await shot(page, "demo-09-about");
+  await page.waitForURL(/\/app$/);
+  await expect(page.getByTestId("about-footer")).toHaveCount(0);
+  const health = await page.request.get("/api/health");
+  expect(health.status()).toBe(200);
+  const healthText = await health.text();
+  expect(JSON.parse(healthText)).toMatchObject({ ok: true, backend: expect.stringMatching(/^(sqlite|postgres)$/) });
+  expect(healthText).not.toMatch(/sk-|postgres:\/\/|api_key/i);
 
   expect(external, "requests that tried to leave localhost").toEqual([]);
   expect(errors, "console errors").toEqual([]);
@@ -182,11 +192,48 @@ test("the health check and home page answer on the demo server", async ({ reques
 // (With PUBLIC_UPLOADS=1 the same form is enabled; that path is covered by lib/__tests__/publicUploads.)
 test("adding a lecture stays disabled on the demo without PUBLIC_UPLOADS", async ({ page, request }) => {
   await page.goto("/lectures/new");
-  await expect(page.getByTestId("upload-demo-note")).toHaveText("Adding a lecture is available when you run Inkling yourself.");
+  await expect(page.getByTestId("upload-demo-note")).toHaveText("Adding a lecture is available when you run TraceIt yourself.");
   await expect(page.getByTestId("upload-submit")).toBeDisabled();
   const res = await request.post("/api/lectures", {
     headers: { origin: "http://127.0.0.1:3101" },
     multipart: { title: "x", durationMs: "1000", media: { name: "a.wav", mimeType: "audio/wav", buffer: Buffer.from("RIFF0000WAVE") } },
   });
   expect(res.status()).toBe(403);
+});
+
+// A visitor arrives signed out: the sign-in page offers the demo (no sign-up on the public demo).
+test.describe("signed out", () => {
+  test.use({ storageState: SIGNED_OUT });
+
+  test("“Try the demo” signs in as Maya and opens her notes", async ({ page }) => {
+    await page.goto("/app");
+    await page.waitForURL((url) => url.pathname === "/signin" && url.searchParams.get("next") === "/app");
+    await expect(page.getByTestId("signin-form")).toBeVisible();
+    await expect(page.getByRole("link", { name: "Create an account" })).toHaveCount(0);
+    await page.getByTestId("try-demo-student").click();
+    await page.waitForURL((url) => url.pathname === "/app");
+    await expect(page.getByTestId("user-menu")).toContainText("Maya");
+    const rows = page.getByTestId("session-link");
+    await expect(rows).toHaveCount(2);
+    await expect(rows.nth(1)).toContainText("Maya — Session 1");
+    // Creating an account is for self-hosted copies.
+    const signup = await page.request.post("/api/auth/signup", {
+      headers: { origin: DEMO_BASE },
+      data: { name: "Visitor", email: "visitor@example.test", password: "long enough password", role: "student" },
+    });
+    expect(signup.status()).toBe(403);
+  });
+
+  test("“Try the teacher view” signs in as the demo teacher and opens the demo class", async ({ page }) => {
+    await page.goto("/signin");
+    await page.getByTestId("try-demo-teacher").click();
+    await page.waitForURL((url) => url.pathname === "/classes");
+    await expect(page.getByTestId("user-menu")).toBeVisible();
+    const card = page.getByTestId("class-card").filter({ hasText: "Calculus I" });
+    await expect(card).toBeVisible();
+    await expect(card.getByTestId("join-code")).toContainText(/MAYA[\s-]?2026/);
+    // No new classes on the public demo.
+    const created = await page.request.post("/api/classes", { headers: { origin: DEMO_BASE }, data: { name: "Mine" } });
+    expect(created.status()).toBe(403);
+  });
 });

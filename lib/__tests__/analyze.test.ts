@@ -12,8 +12,8 @@ import { applyCheckAnswer, buildTimeline } from '../classify';
 import type { ConfusionWindow, Revision, Stroke } from '../types';
 
 // Point the repository at a throwaway SQLite file *before* lib/db is first imported.
-const dir = mkdtempSync(join(tmpdir(), 'inkling-analyze-'));
-process.env.INKLING_DB_PATH = join(dir, 'test.db');
+const dir = mkdtempSync(join(tmpdir(), 'traceit-analyze-'));
+process.env.TRACEIT_DB_PATH = join(dir, 'test.db');
 
 type DbModule = typeof import('../db');
 type AnalyzeModule = typeof import('../analyze');

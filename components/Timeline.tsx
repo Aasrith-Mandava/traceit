@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useId, useMemo } from "react";
 import type { ConfusionWindow, TimeRange, TimelineEvent, TimelineEventType } from "@/lib/types";
 import { MOMENT_META, MOMENT_ORDER } from "@/lib/moments";
 import { SCORING_CONFIG } from "@/lib/scoring";
@@ -22,7 +22,7 @@ const GUIDE_CLASS: Record<TimelineEventType, string> = {
 
 /**
  * Shape + colour coded so a moment never relies on colour alone:
- * corrected = filled cyan-blue dot, unresolved gap = open amber ring, breakthrough = slate-ink diamond.
+ * Fixed = filled green dot, Still fuzzy = open orange ring, Aha moment = pink diamond.
  */
 export function MomentGlyph({ type, size = 14, className = "" }: { type: TimelineEventType; size?: number; className?: string }) {
   return (
@@ -70,8 +70,17 @@ interface TimelineProps {
   selectedId: string | null;
   onSelect: (id: string | null) => void;
   onRetry: () => void;
+  /**
+   * The student wrote for less time than the baseline needs (lib/scoring writingBelowBaseline): an
+   * empty trail then means "not enough writing yet", not "nothing went wrong".
+   */
+  littleInk?: boolean;
 }
 
+/**
+ * "Your learning trail": a white card with the lecture as a track — the "your normal pace" zone, the
+ * hesitation sparkline (indigo) and one shape-coded marker per moment — between 00:00 and the end.
+ */
 export default function Timeline({
   status,
   durationMs,
@@ -81,8 +90,11 @@ export default function Timeline({
   selectedId,
   onSelect,
   onRetry,
+  littleInk = false,
 }: TimelineProps) {
   const spark = useMemo(() => sparkPath(windows, durationMs), [windows, durationMs]);
+  // Unique per instance (and safe inside url(#…)): React ids carry characters CSS would need escaped.
+  const gradientId = `trail-${useId().replace(/[^\w-]/g, "")}`;
 
   const placed = useMemo(() => placeMarkers(events, durationMs), [events, durationMs]);
 
@@ -91,12 +103,22 @@ export default function Timeline({
   const ready = status === "ready";
 
   return (
-    <section aria-labelledby="timeline-heading" className="flex flex-col gap-1.5">
-      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
-        <h2 id="timeline-heading" className="eyebrow">
-          Learning timeline
-        </h2>
-        <ul aria-label="Legend" className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-ink-muted">
+    <section
+      aria-labelledby="timeline-heading"
+      className="flex flex-col gap-2.5 rounded-[20px] border border-line bg-chrome px-4 pt-4 pb-3.5 sm:px-5"
+    >
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
+          <h2 id="timeline-heading" className="font-display text-lg leading-tight font-bold text-ink">
+            Your learning trail
+          </h2>
+          {ready && events.length > 0 ? (
+            <p data-testid="timeline-hint" className="text-[13px] text-ink-subtle">
+              Tap a marker to jump to it
+            </p>
+          ) : null}
+        </div>
+        <ul aria-label="Legend" className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px] text-ink-muted">
           {MOMENT_ORDER.map((t) => (
             <li key={t} className="inline-flex items-center gap-1.5">
               <MomentGlyph type={t} size={12} />
@@ -106,16 +128,18 @@ export default function Timeline({
         </ul>
       </div>
 
-      <div className="flex items-center gap-3">
-        <span className="w-10 shrink-0 font-mono text-xs tabular-nums text-ink-subtle">{formatClock(0)}</span>
+      <div className="flex items-center gap-2.5 sm:gap-3">
+        <span className="shrink-0 font-mono text-xs tabular-nums text-ink-subtle">{formatClock(0)}</span>
         <div
           data-testid="timeline"
           data-status={status}
           data-event-count={events.length}
-          className="relative h-14 min-w-0 flex-1 rounded-md border border-line bg-chrome shadow-hairline"
+          className="relative min-h-[72px] min-w-0 flex-1 rounded-[14px] border border-line bg-chrome-hover"
         >
-          {/* Baseline: the first two minutes of the student's own writing calibrate "your normal", so
-              nothing is flagged there. It follows the student (mid-lecture starts, jumps ahead). */}
+          {/* "Your normal pace": the first two minutes of the student's own writing calibrate "your normal", so
+              nothing is flagged there. It follows the student (mid-lecture starts, jumps ahead). The label
+              stays on one line and may run past a narrow zone, so a zone in the right half anchors it to
+              its right edge to keep it inside the track. */}
           {baseline.map((zone, i) => (
             <div
               key={zone.startMs}
@@ -123,19 +147,24 @@ export default function Timeline({
               data-testid="timeline-baseline"
               data-start-ms={zone.startMs}
               data-end-ms={zone.endMs}
-              className={`absolute inset-y-0 overflow-hidden border-dashed border-line ${
-                zone.startMs <= 0 ? "rounded-l-md border-r" : "border-x"
+              className={`absolute inset-y-0 border-dashed border-line-strong/70 ${
+                zone.startMs <= 0 ? "rounded-l-[13px] border-r" : "border-x"
               }`}
               style={{
                 left: `${pct(zone.startMs)}%`,
                 width: `${pct(zone.endMs) - pct(zone.startMs)}%`,
                 backgroundImage:
-                  "repeating-linear-gradient(135deg, transparent 0 6px, rgb(15 23 42 / 0.035) 6px 7px)",
+                  "repeating-linear-gradient(135deg, transparent 0 6px, rgb(22 19 43 / 0.06) 6px 7px)",
               }}
             >
-              {i === 0 ? (
-                <span className="absolute top-1 left-2 text-[10px] leading-none font-medium tracking-wide text-ink-subtle/80 uppercase">
-                  Baseline
+              {/* The label gives way to the empty-trail note, which would sit on top of it on phones. */}
+              {i === 0 && !(ready && events.length === 0) ? (
+                <span
+                  className={`absolute top-1.5 text-[10px] leading-none font-extrabold tracking-[0.1em] whitespace-nowrap text-ink-subtle uppercase ${
+                    pct(zone.startMs) > 50 ? "right-2.5" : "left-2.5"
+                  }`}
+                >
+                  Your normal pace
                 </span>
               ) : null}
             </div>
@@ -155,9 +184,21 @@ export default function Timeline({
               aria-hidden="true"
               viewBox="0 0 1000 100"
               preserveAspectRatio="none"
-              className="absolute inset-0 size-full overflow-visible rounded-md"
+              className="absolute inset-0 size-full overflow-visible rounded-[13px]"
             >
-              <path d={spark} className="fill-ink/[0.06] stroke-ink/25" strokeWidth="1" vectorEffect="non-scaling-stroke" />
+              <defs>
+                <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0" stopOpacity="0.45" style={{ stopColor: "var(--color-accent-light)" }} />
+                  <stop offset="1" stopOpacity="0.04" style={{ stopColor: "var(--color-accent-light)" }} />
+                </linearGradient>
+              </defs>
+              <path
+                d={spark}
+                fill={`url(#${gradientId})`}
+                className="stroke-[#6f63f2]"
+                strokeWidth="2"
+                vectorEffect="non-scaling-stroke"
+              />
             </svg>
           ) : null}
 
@@ -165,30 +206,38 @@ export default function Timeline({
             <p
               role="status"
               data-testid="timeline-analyzing"
-              className="absolute inset-0 flex items-center justify-center gap-2 text-sm text-ink-muted"
+              className="absolute inset-0 flex items-center justify-center gap-2 text-sm font-semibold text-ink-muted"
             >
-              <span aria-hidden="true" className="size-1.5 animate-pulse rounded-pill bg-accent" />
-              Analyzing your notes…
+              <span aria-hidden="true" className="size-2 animate-pulse rounded-pill bg-accent" />
+              Thinking hard… reading your notes
             </p>
           ) : null}
 
           {status === "error" ? (
-            <div role="alert" className="absolute inset-0 flex items-center justify-center gap-2 text-sm text-danger">
-              Couldn’t analyze this session.
+            <div role="alert" className="absolute inset-0 flex items-center justify-center gap-2 px-3 text-sm text-danger">
+              Couldn’t read this session.
               <button
                 type="button"
                 onClick={onRetry}
-                className="press inline-flex min-h-11 items-center rounded-pill px-3 font-semibold text-accent hover:bg-accent-soft"
+                className="press inline-flex min-h-11 items-center rounded-md px-3 font-bold text-accent hover:bg-accent-soft"
               >
                 Try again
               </button>
             </div>
           ) : null}
 
+          {/* In the flow (not laid over the track), so a long note on a phone makes the track taller
+              instead of spilling out of it. */}
           {ready && events.length === 0 ? (
-            <p data-testid="timeline-empty" className="absolute inset-0 flex items-center justify-center px-3">
-              <span className="rounded-pill bg-chrome/90 px-3 py-1 text-center text-sm text-pretty text-ink-muted">
-                Nothing flagged — your notes flowed steadily through this lecture.
+            <p
+              data-testid="timeline-empty"
+              data-reason={littleInk ? "little-ink" : "steady"}
+              className="relative flex min-h-[70px] items-center justify-center px-3 py-2"
+            >
+              <span className="rounded-[12px] bg-chrome/90 px-3 py-1 text-center text-sm text-pretty text-ink-muted">
+                {littleInk
+                  ? "Not enough writing to spot anything yet — write along for a few minutes while the lecture plays, then finish again."
+                  : "Nothing flagged — your notes flowed steadily all the way through."}
               </span>
             </p>
           ) : null}
@@ -202,7 +251,7 @@ export default function Timeline({
                     {selected ? (
                       <span
                         aria-hidden="true"
-                        className={`absolute inset-y-1 left-0 w-px -translate-x-1/2 opacity-60 ${GUIDE_CLASS[e.type]}`}
+                        className={`absolute -inset-y-1 left-0 w-0.5 -translate-x-1/2 rounded-pill opacity-70 ${GUIDE_CLASS[e.type]}`}
                       />
                     ) : null}
                     <button
@@ -218,12 +267,15 @@ export default function Timeline({
                       className="group absolute top-1/2 left-0 inline-flex size-11 -translate-x-1/2 items-center justify-center rounded-pill"
                       style={{ marginTop: lane === 1 ? -30 : -22 }}
                     >
+                      {/* Selected: a white disc with an ink ring, lifted. */}
                       <span
-                        className={`inline-flex items-center justify-center rounded-pill transition-[transform,box-shadow] duration-150 ease-out group-hover:scale-110 group-active:scale-95 ${
-                          selected ? "scale-125 shadow-[0_0_0_3px_var(--color-chrome),0_0_0_4.5px_var(--color-ink)]" : ""
+                        className={`inline-flex items-center justify-center rounded-pill transition-transform duration-150 ease-out group-hover:scale-110 group-active:scale-95 ${
+                          selected
+                            ? "size-9 border-2 border-ink bg-chrome shadow-[0_6px_16px_-6px_rgb(22_19_43/0.4)]"
+                            : "size-7"
                         }`}
                       >
-                        <MomentGlyph type={e.type} size={16} />
+                        <MomentGlyph type={e.type} size={selected ? 16 : 18} />
                       </span>
                     </button>
                   </li>
@@ -232,9 +284,7 @@ export default function Timeline({
             </ol>
           ) : null}
         </div>
-        <span className="w-10 shrink-0 text-right font-mono text-xs tabular-nums text-ink-subtle">
-          {formatClock(durationMs)}
-        </span>
+        <span className="shrink-0 text-right font-mono text-xs tabular-nums text-ink-subtle">{formatClock(durationMs)}</span>
       </div>
     </section>
   );

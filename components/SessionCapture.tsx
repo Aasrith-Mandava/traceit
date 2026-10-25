@@ -27,7 +27,20 @@ import OpenGapsBanner from "./OpenGapsBanner";
 import type { ProgressThread } from "@/lib/progress";
 import TranscriptPanel from "./TranscriptPanel";
 import { EraserIcon, PenIcon, TranscriptIcon, UndoIcon } from "./icons";
-import { BackLink, Divider, GhostToggle, TopBar, btnPrimary, iconBtn } from "./ui";
+import ToolSizePicker, { useStoredChoice } from "./ToolSizePicker";
+import {
+  DEFAULT_ERASER_SIZE,
+  DEFAULT_PEN_SIZE,
+  ERASER_SIZES,
+  ERASER_SIZE_KEY,
+  PEN_SIZES,
+  PEN_SIZE_KEY,
+  eraserRadius,
+  penScale,
+  type EraserSizeId,
+  type PenSizeId,
+} from "@/lib/toolSizes";
+import { BackLink, Divider, GhostToggle, TopBar, btnPrimary } from "./ui";
 
 const STATUS_LABEL: Record<SaveStatus, string> = {
   saved: "Saved",
@@ -38,20 +51,37 @@ const STATUS_LABEL: Record<SaveStatus, string> = {
 };
 
 const STATUS_DOT: Record<SaveStatus, string> = {
-  saved: "bg-ok",
+  saved: "bg-corrected",
   unsaved: "bg-ink-subtle",
   saving: "bg-accent",
   retrying: "bg-danger",
   rejected: "bg-danger",
 };
 
+const STATUS_TEXT: Record<SaveStatus, string> = {
+  saved: "text-ok",
+  unsaved: "text-ink-muted",
+  saving: "text-ink-muted",
+  retrying: "text-danger",
+  rejected: "text-danger",
+};
+
 /** Autosave heartbeat (retries back off on their own schedule; see lib/inkSaver). */
 const AUTOSAVE_MS = 2000;
 
+/** Pen / Eraser in the tool tray: the active tool is a dark ink pill. */
 const segBtn = (active: boolean) =>
-  `press inline-flex min-h-11 items-center gap-2 rounded-pill px-4 text-sm font-semibold ${
+  `press inline-flex min-h-11 items-center gap-2 rounded-[13px] px-3.5 text-[15px] font-bold sm:px-[18px] ${
     active ? "bg-ink text-white shadow-raised" : "text-ink-muted hover:bg-chrome hover:text-ink"
   }`;
+
+/** Size choices in the tool tray; `dot` is how big each option's dot looks (px). */
+const PEN_DOTS: Record<PenSizeId, number> = { fine: 4, medium: 7, bold: 12 };
+const ERASER_DOTS: Record<EraserSizeId, number> = { small: 12, large: 22 };
+const PEN_OPTIONS = PEN_SIZES.map((s) => ({ id: s.id, label: s.label, dot: PEN_DOTS[s.id] }));
+const ERASER_OPTIONS = ERASER_SIZES.map((s) => ({ id: s.id, label: s.label, dot: ERASER_DOTS[s.id] }));
+const PEN_IDS = PEN_SIZES.map((s) => s.id);
+const ERASER_IDS = ERASER_SIZES.map((s) => s.id);
 
 /**
  * Undoable actions, newest last: a pen stroke; a pen gesture that erased ink (a scribble-out
@@ -73,6 +103,8 @@ interface Props {
   /** Whether auto-transcription (OpenAI or Groq Whisper) is available on the server. */
   aiConfigured: boolean;
   initialStrokes: Stroke[];
+  /** Unique per server render (also the component's key): spots a page restored from the router cache. */
+  loadId: string;
   /** Gaps still open from earlier sessions of this lecture (the "Jump to" banner). */
   openGaps?: ProgressThread[];
   /** Live lectures can capture here (false in DEMO_MODE: shown, but disabled with a note). */
@@ -89,17 +121,30 @@ function liveOffsetMs(lecture: Lecture, words: TranscriptWord[], strokes: Stroke
   return Math.ceil(last);
 }
 
+/** Server renders this document has shown (see the refresh in SessionCapture). */
+const shownLoads = new Set<string>();
+
 export default function SessionCapture({
   session,
   lecture,
   words: initialWords,
   aiConfigured,
   initialStrokes,
+  loadId,
   openGaps = [],
   liveAvailable = true,
   transcribeAvailable = true,
 }: Props) {
   const router = useRouter();
+  // Browser back / forward (e.g. Back from Study mode) reuses this page as first rendered, without
+  // the ink written since: fetch it again (a new loadId, so a fresh SessionCapture with every stroke).
+  const loadChecked = useRef(false);
+  useEffect(() => {
+    if (loadChecked.current) return;
+    loadChecked.current = true;
+    if (shownLoads.has(loadId)) router.refresh();
+    else shownLoads.add(loadId);
+  }, [loadId, router]);
   const audioRef = useRef<HTMLMediaElement>(null);
   // A Live lecture (no recording yet): the microphone and the browser's speech recognition stand
   // in for the media player; the rest of capture is the same.
@@ -113,10 +158,13 @@ export default function SessionCapture({
   const closeTranscript = useCallback(() => setTranscriptOpen(false), []);
   const [strokes, setStrokes] = useState<Stroke[]>(initialStrokes);
   const [tool, setTool] = useState<Tool>("pen");
+  // Pen and eraser sizes, remembered on this device (lib/toolSizes). The pen size is saved on each stroke.
+  const [penSize, setPenSize] = useStoredChoice<PenSizeId>(PEN_SIZE_KEY, PEN_IDS, DEFAULT_PEN_SIZE);
+  const [eraserSize, setEraserSize] = useStoredChoice<EraserSizeId>(ERASER_SIZE_KEY, ERASER_IDS, DEFAULT_ERASER_SIZE);
   const [showGhost, setShowGhost] = useState(false);
   const [status, setStatus] = useState<SaveStatus>("saved");
   const [ending, setEnding] = useState<"idle" | "saving" | "uploading" | "analyzing">("idle");
-  // Why "End session" could not finish (shown with a Retry next to the button).
+  // Why "Finish & review" could not finish (shown with a Retry next to the button).
   const [endError, setEndError] = useState<string | null>(null);
 
   // Canonical data lives in refs (updated synchronously in handlers) so saves never miss an edit.
@@ -140,6 +188,18 @@ export default function SessionCapture({
     const timer = setTimeout(() => setScribbleToast(null), TOAST_MS);
     return () => clearTimeout(timer);
   }, [scribbleToast]);
+
+  // Recorded lectures: ink is stamped with the lecture's clock, so while it is paused the band says
+  // "Press ▶" — before anything is written, and after the student writes while it is paused (until
+  // it plays again).
+  const [drewWhilePaused, setDrewWhilePaused] = useState(false);
+  useEffect(() => {
+    const media = audioRef.current;
+    if (isLive || !media) return;
+    const onPlay = () => setDrewWhilePaused(false);
+    media.addEventListener("play", onPlay);
+    return () => media.removeEventListener("play", onPlay);
+  }, [isLive]);
 
   const liveGetMs = live.getMs;
   const getLectureMs = useCallback(
@@ -181,8 +241,9 @@ export default function SessionCapture({
     };
   }, [session.id]);
 
-  const handleStrokeEnd = (points: Point[], pointerType: PointerKind) => {
-    const stroke = buildStroke(newId("k_"), session.id, points, pointerType);
+  const handleStrokeEnd = (points: Point[], pointerType: PointerKind, size: number) => {
+    if (!isLive && audioRef.current?.paused) setDrewWhilePaused(true);
+    const stroke = buildStroke(newId("k_"), session.id, points, pointerType, size);
     // A pen zig-zag over existing ink scribbles it out: same outcome as the eraser (kept as ghost).
     const out = applyScribbleOut(strokesRef.current, stroke, newId("e_"));
     if (out) {
@@ -291,7 +352,7 @@ export default function SessionCapture({
     setEnding("saving");
     setEndError(null);
     audioRef.current?.pause();
-    // Live: stop listening and recording (once, even if End is retried), then save the transcript.
+    // Live: stop listening and recording (once, even if wrapping up is retried), then save the transcript.
     let liveResult: FinishResult | null = null;
     if (isLive && liveAvailable) {
       liveFinishRef.current ??= live.finish();
@@ -303,7 +364,7 @@ export default function SessionCapture({
       }
     }
     const saver = saverRef.current!;
-    // An explicit End also re-sends anything the server refused earlier; a network blip gets a
+    // An explicit wrap-up also re-sends anything the server refused earlier; a network blip gets a
     // second chance. Ink written while saving is sent too.
     let outcome = await saver.flush({ includeRejected: true });
     if (outcome === "transient") outcome = await saver.flush();
@@ -343,12 +404,14 @@ export default function SessionCapture({
     } catch (err) {
       console.error(`Analysis request failed for session ${session.id}`, err);
     }
+    // Push, not replace: Back from Study mode returns to this writing screen (lib/navTrail).
     router.push(`/review/${session.id}`);
   };
 
   // Lines the student drew (not stored pieces): "1 stroke · 1 erased part" (lib/ink inkCounts).
   const countLabel = inkCountsLabel(inkCounts(strokes));
 
+  // "Captions" in the dark lecture band (outlined; lime while the panel is open).
   const transcriptToggle = (
     <button
       type="button"
@@ -356,75 +419,112 @@ export default function SessionCapture({
       aria-pressed={transcriptOpen}
       aria-controls="transcript-panel"
       onClick={() => setTranscriptOpen((o) => !o)}
-      className={`press inline-flex min-h-11 shrink-0 items-center gap-2 rounded-pill px-3 text-sm font-medium ${
-        transcriptOpen ? "bg-accent-soft text-accent" : "text-ink-muted hover:bg-chrome-hover hover:text-ink"
+      className={`press inline-flex min-h-11 shrink-0 items-center gap-2 rounded-[10px] border px-3 text-sm font-semibold ${
+        transcriptOpen
+          ? "border-highlight/50 bg-highlight/15 text-highlight"
+          : "border-white/20 text-white hover:bg-white/10"
       }`}
     >
-      <TranscriptIcon size={18} />
-      <span className="hidden sm:inline">Transcript</span>
+      <TranscriptIcon size={16} strokeWidth={2.2} />
+      {/* Narrow phones: icon only; the name stays for screen readers. */}
+      <span className="sr-only sm:not-sr-only">Captions</span>
     </button>
   );
   const playerAside = (
-    <div className="flex shrink-0 items-center gap-1 pr-1">
+    <div className="flex shrink-0 items-center gap-3">
       <HesitationMeter strokes={strokes} words={meterWords} getLectureMs={getLectureMs} />
-      <span data-testid="stroke-counter" className="hidden text-sm tabular-nums text-ink-subtle lg:block">
+      <span data-testid="stroke-counter" className="hidden font-mono text-[13px] tabular-nums text-night-text lg:block">
         {countLabel.strokes}
-        {countLabel.erased ? <span className="text-ghost-strong"> · {countLabel.erased}</span> : null}
+        {countLabel.erased ? <span className="text-accent-line"> · {countLabel.erased}</span> : null}
       </span>
     </div>
   );
 
   return (
-    <div className="flex h-dvh flex-col overflow-hidden overscroll-none">
+    <div className="flex h-dvh flex-col overflow-hidden overscroll-none bg-desk">
+      {/* White top bar: who/what on the left, the tool tray in the middle (its own row below
+          1180px), save state and "Finish & review" on the right. */}
       <TopBar label="Note toolbar">
-        <div className="flex min-w-[10rem] flex-1 items-center gap-1">
+        <div className="flex min-w-[10rem] flex-1 items-center gap-2.5 min-[1180px]:basis-[220px]">
           <BackLink />
-          <div className="min-w-0">
-            <p className="truncate text-xs font-bold tracking-wide text-accent-press uppercase">Notes</p>
-            <h1 className="truncate text-base leading-tight font-bold tracking-tight text-ink">{session.title}</h1>
+          <div className="flex min-w-0 flex-col">
+            <p className="truncate text-[11px] leading-tight font-extrabold tracking-[0.12em] text-accent uppercase">
+              Writing now
+            </p>
+            <h1 className="truncate font-display text-[19px] leading-tight font-bold text-ink">{session.title}</h1>
           </div>
         </div>
 
-        <div className="order-last flex basis-full flex-wrap items-center gap-1.5 pl-1 lg:order-none lg:basis-auto lg:pl-0">
-          <div role="group" aria-label="Tool" className="inline-flex gap-0.5 rounded-pill border border-line bg-chrome-press/70 p-0.5">
+        <div className="order-last flex basis-full justify-center min-[1180px]:order-none min-[1180px]:basis-auto">
+          <div className="inline-flex max-w-full flex-wrap items-center justify-center gap-1 rounded-[18px] border border-line bg-desk p-[5px] sm:gap-1.5">
+            <div role="group" aria-label="Tool" className="inline-flex gap-1 sm:gap-1.5">
+              <button
+                type="button"
+                data-testid="tool-pen"
+                aria-pressed={tool === "pen"}
+                className={segBtn(tool === "pen")}
+                onClick={() => setTool("pen")}
+              >
+                <PenIcon size={18} strokeWidth={2.2} />
+                Pen
+              </button>
+              <button
+                type="button"
+                data-testid="tool-eraser"
+                aria-pressed={tool === "eraser"}
+                className={segBtn(tool === "eraser")}
+                onClick={() => setTool("eraser")}
+              >
+                <EraserIcon size={18} strokeWidth={2.2} />
+                Eraser
+              </button>
+            </div>
+            {/* The active tool's size: Fine / Medium / Bold ink, or a Small / Large eraser. */}
+            {tool === "pen" ? (
+              <ToolSizePicker
+                key="pen"
+                label="Pen size"
+                testIdPrefix="pen-size"
+                options={PEN_OPTIONS}
+                value={penSize}
+                onChange={setPenSize}
+              />
+            ) : (
+              <ToolSizePicker
+                key="eraser"
+                label="Eraser size"
+                testIdPrefix="eraser-size"
+                options={ERASER_OPTIONS}
+                value={eraserSize}
+                onChange={setEraserSize}
+                ring
+              />
+            )}
+            <Divider />
             <button
               type="button"
-              data-testid="tool-pen"
-              aria-pressed={tool === "pen"}
-              className={segBtn(tool === "pen")}
-              onClick={() => setTool("pen")}
+              data-testid="undo"
+              aria-label="Undo"
+              title="Undo"
+              className="press inline-flex size-11 shrink-0 items-center justify-center rounded-[13px] text-ink-muted hover:bg-chrome hover:text-ink"
+              onClick={handleUndo}
             >
-              <PenIcon size={18} />
-              Pen
+              <UndoIcon size={19} strokeWidth={2.2} />
             </button>
-            <button
-              type="button"
-              data-testid="tool-eraser"
-              aria-pressed={tool === "eraser"}
-              className={segBtn(tool === "eraser")}
-              onClick={() => setTool("eraser")}
-            >
-              <EraserIcon size={18} />
-              Eraser
-            </button>
+            <GhostToggle checked={showGhost} onChange={setShowGhost} />
           </div>
-          <button type="button" data-testid="undo" aria-label="Undo" title="Undo" className={iconBtn} onClick={handleUndo}>
-            <UndoIcon size={20} />
-          </button>
-          <Divider />
-          <GhostToggle checked={showGhost} onChange={setShowGhost} />
         </div>
 
-        <div className="ml-auto flex items-center gap-3">
+        <div className="ml-auto flex shrink-0 items-center justify-end gap-3.5 min-[1180px]:ml-0 min-[1180px]:flex-[1_1_220px]">
           <span
             data-testid="save-status"
             data-status={status}
             role="status"
-            className={`hidden items-center justify-end gap-2 text-right text-sm sm:flex ${
+            className={`hidden items-center justify-end gap-1.5 text-right text-sm font-semibold sm:flex ${
               status === "rejected" ? "w-auto" : "w-40"
-            } ${status === "retrying" || status === "rejected" ? "text-danger" : "text-ink-subtle"}`}
+            } ${STATUS_TEXT[status]}`}
           >
-            <span aria-hidden="true" className={`size-1.5 shrink-0 rounded-pill ${STATUS_DOT[status]}`} />
+            <span aria-hidden="true" className={`size-2 shrink-0 rounded-pill ${STATUS_DOT[status]}`} />
             <span className="truncate">{STATUS_LABEL[status]}</span>
           </span>
           <button
@@ -440,15 +540,15 @@ export default function SessionCapture({
               : ending === "uploading"
                 ? "Saving audio…"
                 : ending === "analyzing"
-                  ? "Analyzing…"
-                  : "End session"}
+                  ? "Getting your review ready…"
+                  : "Finish & review"}
           </button>
         </div>
         {endError ? (
           <div
             role="alert"
             data-testid="end-session-error"
-            className="enter-soft absolute top-full right-2 z-20 mt-2 flex max-w-sm items-center gap-3 rounded-pill border border-danger/30 bg-chrome py-1 pr-1 pl-4 text-sm text-danger shadow-page sm:right-3"
+            className="enter-soft absolute top-full right-2 z-20 mt-2 flex max-w-sm items-center gap-3 rounded-md border border-danger/25 bg-chrome py-1.5 pr-1.5 pl-4 text-sm font-medium text-danger shadow-lift sm:right-3"
           >
             <span className="text-pretty">{endError}</span>
             <button
@@ -456,7 +556,7 @@ export default function SessionCapture({
               data-testid="end-session-retry"
               onClick={handleEnd}
               disabled={ending !== "idle"}
-              className="press inline-flex min-h-11 shrink-0 items-center rounded-pill px-3 font-semibold text-accent hover:bg-accent-soft"
+              className="press inline-flex min-h-11 shrink-0 items-center rounded-[12px] px-3 font-bold text-accent hover:bg-accent-soft hover:text-accent-press"
             >
               Retry
             </button>
@@ -479,11 +579,15 @@ export default function SessionCapture({
           mediaRef={audioRef}
           actions={transcriptToggle}
           aside={playerAside}
+          hint={strokes.length === 0 || drewWhilePaused}
         />
       )}
 
-      <main className="relative flex min-h-0 flex-1">
-        <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
+      {/* The notebook page sits on the lavender desk; on wide screens the transcript is a white card
+          beside it, on narrow ones a sheet over its lower part. The page is never width-capped: ink
+          is stored in page pixels, so a narrower page would hide what was written near the right. */}
+      <main className="relative flex min-h-0 flex-1 justify-center px-2 py-2 sm:px-4 sm:py-4 lg:gap-6 lg:px-6 lg:pt-6 lg:pb-6">
+        <div className="relative flex min-h-0 w-full min-w-0 flex-1 flex-col">
           {isLive ? null : (
             <LectureMedia
               src={lectureMediaUrl(lecture.id)}
@@ -503,15 +607,15 @@ export default function SessionCapture({
                 key={scribbleToast.scribbleId}
                 data-testid="scribble-toast"
                 data-kind={scribbleToast.by ?? "scribble"}
-                className="enter-soft pointer-events-auto flex items-center gap-3 rounded-pill border border-white/10 bg-ink/95 py-1 pr-1 pl-4 text-sm text-white shadow-page"
+                className="enter-soft pointer-events-auto flex items-center gap-3 rounded-pill bg-night py-1 pr-1 pl-4 text-sm font-semibold text-white shadow-lift"
               >
-                <span aria-hidden="true" className="inline-block w-3.5 border-t-2 border-dashed border-teal-300" />
+                <span aria-hidden="true" className="inline-block w-4 border-t-2 border-dashed border-accent-light" />
                 <span>{scribbleToast.by === "strike" ? "Struck through" : "Scribbled out"} — kept as ghost</span>
                 <button
                   type="button"
                   data-testid="scribble-undo"
                   onClick={() => undoScribble(scribbleToast)}
-                  className="press inline-flex min-h-11 items-center gap-1.5 rounded-pill px-3.5 font-semibold text-teal-200 hover:bg-white/10 active:bg-white/15"
+                  className="press inline-flex min-h-11 items-center gap-1.5 rounded-pill px-3.5 font-bold text-highlight hover:bg-white/10 active:bg-white/15"
                 >
                   <UndoIcon size={16} />
                   Undo
@@ -526,8 +630,22 @@ export default function SessionCapture({
             getLectureMs={getLectureMs}
             onStrokeEnd={handleStrokeEnd}
             onErase={handleErase}
-            className="paper min-h-0 flex-1"
-          />
+            penSize={penScale(penSize)}
+            eraserRadius={eraserRadius(eraserSize)}
+            className="paper min-h-0 flex-1 rounded-[6px_6px_18px_18px] shadow-page"
+          >
+            {/* A completely empty page (no ink, live or erased) gets a faint handwritten nudge; it
+                goes with the first stroke. Decorative: the ink passes straight through it. */}
+            {strokes.length === 0 ? (
+              <p
+                aria-hidden="true"
+                data-testid="capture-empty-hint"
+                className="pointer-events-none absolute top-3 left-10 max-w-[min(30rem,calc(100%-3.5rem))] -rotate-1 font-hand text-[23px] leading-[1.15] text-ink opacity-35 select-none sm:left-12 sm:text-[26px]"
+              >
+                messy = progress — scribble boldly. Every crossed-out line stays as a faint ghost.
+              </p>
+            ) : null}
+          </InkCanvas>
           {isLive ? null : <OpenGapsBanner threads={openGaps} mediaRef={audioRef} />}
         </div>
         {transcriptOpen && isLive ? (

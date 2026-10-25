@@ -1,7 +1,7 @@
 // `npm run start:railway`: the production entry point for a hosted demo (Railway; see docs/railway.md).
 // Run after `next build`. It:
 //
-//   1. makes the data folders on the persistent volume: INKLING_DATA_DIR (e.g. /data) holds the
+//   1. makes the data folders on the persistent volume: TRACEIT_DATA_DIR (e.g. /data) holds the
 //      SQLite database, uploads/ (Notability PDFs in uploads/notability) and tts/ (see lib/paths.ts);
 //   2. in DEMO_MODE, seeds the demo with `seed:demo` (idempotent: only when it is missing or
 //      incomplete, e.g. a fresh volume), or rebuilds it with `--reset` when DEMO_RESET_ON_START=1;
@@ -10,7 +10,7 @@
 //
 // It never prints secrets: only which storage is used and the reset settings.
 import { spawn, spawnSync } from "node:child_process";
-import { mkdirSync } from "node:fs";
+import { existsSync, mkdirSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -22,18 +22,21 @@ const demo = truthy(env.DEMO_MODE);
 const port = setting(env.PORT) ?? "3000";
 const host = setting(env.HOST) ?? "0.0.0.0";
 
-// Same defaults as lib/paths.ts (relative paths are resolved against the project root).
+// Same defaults as lib/paths.ts (relative paths are resolved against the project root), including
+// the fallbacks from before the rename: INKLING_* variables and an existing inkling.db.
 const at = (p) => resolve(root, p);
-const dataDir = at(setting(env.INKLING_DATA_DIR) ?? "data");
-const dbPath = at(setting(env.INKLING_DB_PATH) ?? join(dataDir, "inkling.db"));
-const uploadDir = at(setting(env.INKLING_UPLOAD_DIR) ?? join(dataDir, "uploads"));
-const ttsDir = at(setting(env.INKLING_TTS_DIR) ?? join(dataDir, "tts"));
+const envSetting = (name) => setting(env[`TRACEIT_${name}`]) ?? setting(env[`INKLING_${name}`]);
+const dataDir = at(envSetting("DATA_DIR") ?? "data");
+const defaultDb = !existsSync(join(dataDir, "traceit.db")) && existsSync(join(dataDir, "inkling.db")) ? "inkling.db" : "traceit.db";
+const dbPath = at(envSetting("DB_PATH") ?? join(dataDir, defaultDb));
+const uploadDir = at(envSetting("UPLOAD_DIR") ?? join(dataDir, "uploads"));
+const ttsDir = at(envSetting("TTS_DIR") ?? join(dataDir, "tts"));
 
 const postgres = !!setting(env.DATABASE_URL);
 for (const dir of [dataDir, uploadDir, join(uploadDir, "notability"), ttsDir, ...(postgres ? [] : [dirname(dbPath)])]) {
   mkdirSync(dir, { recursive: true });
 }
-console.log(`▸ Inkling (production) · storage: ${postgres ? "Postgres (DATABASE_URL)" : `SQLite at ${dbPath}`} · files under ${dataDir}`);
+console.log(`▸ TraceIt (production) · storage: ${postgres ? "Postgres (DATABASE_URL)" : `SQLite at ${dbPath}`} · files under ${dataDir}`);
 if (postgres && demo) {
   console.warn("  DATABASE_URL is set: the demo will use that Postgres database, not the volume. Remove it for SQLite.");
 }

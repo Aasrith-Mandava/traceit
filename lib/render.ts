@@ -1,28 +1,37 @@
 // Canvas 2D rendering of strokes, shared by capture and review views.
 import type { BBox, Point, Stroke } from "./types";
 
-export const INK_COLOR = "#0f172a"; // --color-ink
-export const GHOST_COLOR = "#0d9488"; // --color-ghost (teal, drawn dashed at 50%)
+export const INK_COLOR = "#1d1a3a"; // --color-pen
+export const GHOST_COLOR = "#8b80f9"; // --color-ghost (light indigo, drawn dashed at 50%)
 export const BASE_WIDTH = 2.4;
 
-function widthFor(p: Point, pointerType: Stroke["pointerType"]): number {
+/** A stroke's pen size multiplier (Stroke.size; absent = 1 = Medium, see lib/toolSizes). */
+export const strokeSize = (s: Pick<Stroke, "size">): number => s.size ?? 1;
+
+/** Line width at one point: the pen size, times Apple Pencil pressure on top (pens only). */
+export function widthFor(p: Point, pointerType: Stroke["pointerType"], size = 1): number {
   // Only pens report meaningful pressure.
-  if (pointerType !== "pen") return BASE_WIDTH;
+  if (pointerType !== "pen") return BASE_WIDTH * size;
   const pressure = p[2] > 0 ? p[2] : 0.5;
-  return BASE_WIDTH * (0.5 + pressure);
+  return BASE_WIDTH * size * (0.5 + pressure);
 }
 
-export function drawStrokePath(ctx: CanvasRenderingContext2D, points: Point[], pointerType: Stroke["pointerType"]) {
+export function drawStrokePath(
+  ctx: CanvasRenderingContext2D,
+  points: Point[],
+  pointerType: Stroke["pointerType"],
+  size = 1,
+) {
   if (points.length === 0) return;
   if (points.length === 1) {
     const [x, y] = points[0];
     ctx.beginPath();
-    ctx.arc(x, y, widthFor(points[0], pointerType) / 2, 0, Math.PI * 2);
+    ctx.arc(x, y, widthFor(points[0], pointerType, size) / 2, 0, Math.PI * 2);
     ctx.fill();
     return;
   }
   for (let i = 1; i < points.length; i++) {
-    ctx.lineWidth = widthFor(points[i], pointerType);
+    ctx.lineWidth = widthFor(points[i], pointerType, size);
     ctx.beginPath();
     ctx.moveTo(points[i - 1][0], points[i - 1][1]);
     ctx.lineTo(points[i][0], points[i][1]);
@@ -37,19 +46,19 @@ export function drawStroke(ctx: CanvasRenderingContext2D, s: Stroke, ghost: bool
   ctx.lineJoin = "round";
   if (alpha !== undefined) ctx.globalAlpha = alpha;
   if (ghost) {
-    ctx.globalAlpha = alpha ?? 0.5; // teal is lighter than ink: half strength keeps it legible yet clearly "erased"
+    ctx.globalAlpha = alpha ?? 0.5; // ghost indigo is lighter than ink: half strength keeps it legible yet clearly "erased"
     ctx.strokeStyle = GHOST_COLOR;
     ctx.fillStyle = GHOST_COLOR;
     ctx.setLineDash([6, 5]);
     // Draw as one path so the dash pattern flows along the stroke.
-    ctx.lineWidth = BASE_WIDTH;
+    ctx.lineWidth = BASE_WIDTH * strokeSize(s);
     ctx.beginPath();
     s.points.forEach(([x, y], i) => (i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y)));
     ctx.stroke();
   } else {
     ctx.strokeStyle = INK_COLOR;
     ctx.fillStyle = INK_COLOR;
-    drawStrokePath(ctx, s.points, s.pointerType);
+    drawStrokePath(ctx, s.points, s.pointerType, strokeSize(s));
   }
   ctx.restore();
 }
@@ -89,7 +98,8 @@ export function paintStrokes(ctx: CanvasRenderingContext2D, strokes: Stroke[], s
 
 /** Like renderStrokes, but only repaints the given rectangle (CSS px) — cheap enough per pointermove. */
 export function renderRegion(ctx: CanvasRenderingContext2D, region: BBox, strokes: Stroke[], showGhost: boolean) {
-  const pad = BASE_WIDTH * 2;
+  // Covers the half line width of the boldest stroke (Bold 2x with full pen pressure 1.5x).
+  const pad = BASE_WIDTH * 3;
   const [x0, y0, x1, y1] = [region[0] - pad, region[1] - pad, region[2] + pad, region[3] + pad];
   const hits = (s: Stroke) =>
     !isReplaced(s) && s.bbox[0] <= x1 + pad && s.bbox[2] >= x0 - pad && s.bbox[1] <= y1 + pad && s.bbox[3] >= y0 - pad; // bbox is centreline; pad covers line width

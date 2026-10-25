@@ -1,6 +1,6 @@
 // `npm run seed:demo [-- --reset]`: seeds the polished demo (Maya's two sessions, a Notability
 // export, classmates for the class hotspots) into the database the app uses — the local SQLite file
-// (INKLING_DB_PATH, default data/inkling.db) or DATABASE_URL (Postgres / Tiger Data). Loads
+// (TRACEIT_DB_PATH, default data/traceit.db) or DATABASE_URL (Postgres / Tiger Data). Loads
 // .env.local like `next dev`. Idempotent; --reset rebuilds only the demo's own sessions.
 // See lib/demoSeed.ts.
 import { loadEnvConfig } from "@next/env";

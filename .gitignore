@@ -15,7 +15,7 @@
 
 # next.js
 /.next/
-# extra build dirs of side-by-side dev/e2e/preview servers (INKLING_DIST_DIR)
+# extra build dirs of side-by-side dev/e2e/preview servers (TRACEIT_DIST_DIR)
 /.next-*/
 /out/
 
@@ -52,6 +52,8 @@ next-env.d.ts
 /playwright-report
 /blob-report
 /playwright/.cache
+# signed-in browser states written by e2e/auth.setup.ts
+/e2e/.auth/
 
 # design screenshots
 /screenshots

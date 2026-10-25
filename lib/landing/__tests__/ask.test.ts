@@ -33,7 +33,7 @@ describe("knowledge base", () => {
 
 describe("offline FAQ matcher", () => {
   it.each([
-    ["How does Inkling know I'm stuck?", "stuck"],
+    ["How does TraceIt know I'm stuck?", "stuck"],
     ["Does it work with Notability?", "notability"],
     ["Is my data private?", "privacy"],
     ["Which languages?", "languages"],
@@ -42,7 +42,7 @@ describe("offline FAQ matcher", () => {
     ["what happens to stuff I erase", "ghost"],
     ["how accurate is it really", "signal-lab"],
     ["how do I try it on my ipad", "try"],
-    ["What is Inkling?", "what"],
+    ["What is TraceIt?", "what"],
     ["is it free", "pricing"],
     ["what's it built with — groq? timescale?", "tech"],
   ])("%s → %s", (q, id) => {

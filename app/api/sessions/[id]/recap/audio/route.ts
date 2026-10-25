@@ -1,4 +1,6 @@
 import { failResponse } from "@/lib/ai/http";
+import { notFoundJson, ownedSession } from "@/lib/access";
+import { withUser } from "@/lib/auth/core";
 import { languageFromBody } from "@/lib/ai/languages";
 import { aiService } from "@/lib/ai/service";
 import { readBodyText, sameOriginOnly } from "@/lib/http";
@@ -10,8 +12,9 @@ const MAX_BODY_BYTES = 256;
  * (data/tts/<sha>.mp3, keyed by voice, model, text and language). `{ "language": "es" }`.
  * 503 without a server voice — the client then speaks the recap with the browser's voice.
  */
-export const POST = sameOriginOnly(async (request: Request, ctx: RouteContext<"/api/sessions/[id]/recap/audio">) => {
+export const POST = sameOriginOnly(withUser(async (request, user, ctx: RouteContext<"/api/sessions/[id]/recap/audio">) => {
   const { id } = await ctx.params;
+  if (!(await ownedSession(user, id))) return notFoundJson("session");
   const body = await readBodyText(request, MAX_BODY_BYTES);
   if (!body.ok) return body.response;
   const lang = languageFromBody(body.value);
@@ -31,4 +34,4 @@ export const POST = sameOriginOnly(async (request: Request, ctx: RouteContext<"/
     console.error(`recap audio failed for ${id}`, err instanceof Error ? err.message : err);
     return Response.json({ error: "Couldn’t make the audio." }, { status: 500 });
   }
-});
+}));

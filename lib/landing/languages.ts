@@ -1,4 +1,4 @@
-// The 10 languages Inkling's help comes in (same list as the app's lib/ai/languages.ts), each with
+// The 10 languages TraceIt's help comes in (same list as the app's lib/ai/languages.ts), each with
 // the same sample re-explanation of the chain-rule mistake d/dx sin(x²) = cos(x²): pre-written,
 // static strings (no AI call on the landing page). Arabic wraps the maths in Unicode isolates
 // (U+2066…U+2069) so the formulas stay left-to-right inside right-to-left text.

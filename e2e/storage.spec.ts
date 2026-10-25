@@ -3,10 +3,10 @@ import type { InkHotspot, InkWindowStat } from "../lib/dbShared";
 import { buildPhase2Scenario } from "./fixtures/phase2-scenario";
 
 // Storage backend endpoints: health (which backend is live) and the ink time-series statistics,
-// against whichever backend the test server runs (SQLite by default; INKLING_TEST_PG=1 → Postgres).
+// against whichever backend the test server runs (SQLite by default; TRACEIT_TEST_PG=1 → Postgres).
 
 const EVIL = { Origin: "http://evil.example" };
-const expectedBackend = process.env.INKLING_TEST_PG === "1" ? "postgres" : "sqlite";
+const expectedBackend = process.env.TRACEIT_TEST_PG === "1" ? "postgres" : "sqlite";
 
 test("GET /api/health reports the backend without connection details", async ({ request }) => {
   const res = await request.get("/api/health");

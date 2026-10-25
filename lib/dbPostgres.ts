@@ -19,8 +19,10 @@ import demoTranscript from "@/public/demo/lecture.transcript.json";
 import { newId } from "./ink";
 import { DEMO_LECTURE, DEMO_MEDIA_PATH } from "./demo";
 import type {
+  ClassInfo,
   EraseEvent,
   HelpCard,
+  Lecture,
   PointerKind,
   RevisionReading,
   Session,
@@ -28,6 +30,7 @@ import type {
   TimelineEvent,
   TranscriptSource,
   TranscriptWord,
+  User,
 } from "./types";
 import {
   HOTSPOT_BUCKET_MS,
@@ -35,6 +38,10 @@ import {
   SESSION_STROKE_COUNTS_SQL,
   assertStatsWindowMs,
   carryForward,
+  normaliseEmail,
+  sessionStrokeCountsSql,
+  toClassInfo,
+  toUser,
   toStrokeCounts,
   sessionInputAfter,
   toAiCacheEntry,
@@ -50,6 +57,7 @@ import {
   type AiCacheRow,
   type AnalysisStateRow,
   type AnalysisToSave,
+  type ClassRow,
   type Db,
   type DbInfo,
   type EraseRow,
@@ -59,9 +67,11 @@ import {
   type LectureMediaPatch,
   type LectureRecord,
   type LectureRow,
+  type NewClass,
   type NewLecture,
   type NewNotabilityImport,
   type NewSession,
+  type NewUser,
   type NotabilityImportRecord,
   type NotabilityRow,
   type PrevEventRow,
@@ -70,6 +80,8 @@ import {
   type StoredAnalysis,
   type StrokeCountRow,
   type StrokeRow,
+  type StudentClass,
+  type UserRow,
   type WindowRow,
 } from "./dbShared";
 
@@ -191,11 +203,11 @@ async function pgDriver(options: PgConnectionOptions): Promise<SqlDriver> {
     idleTimeoutMillis: 30_000,
     connectionTimeoutMillis: 10_000,
     statement_timeout: 60_000,
-    application_name: "inkling",
+    application_name: "traceit",
     types: { getTypeParser },
   });
   // An idle client dropped by the server must not crash the process (the pool replaces it).
-  pool.on("error", (err) => console.error(`[inkling] postgres: idle connection error: ${err.message}`));
+  pool.on("error", (err) => console.error(`[traceit] postgres: idle connection error: ${err.message}`));
   const runnerOf = (client: Pool | PoolClient): SqlRunner => ({
     async query<R>(text: string, params: unknown[] = []) {
       const res = await client.query(text, params);
@@ -447,7 +459,68 @@ WHERE st.session_id = i.session_id AND st.id = i.stroke_id
   AND st.erased AND COALESCE(st.erased_by, '') = 'undo';
 `,
   },
+  {
+    // Accounts, sign-in sessions (sha256 of the cookie token only), classes and enrollments;
+    // lectures get an owner (NULL = bundled demo / from before accounts) and an optional class.
+    // IF NOT EXISTS throughout: idempotent if re-run.
+    version: 3,
+    name: "accounts and classes",
+    sql: `
+CREATE TABLE IF NOT EXISTS users (
+  id TEXT PRIMARY KEY,
+  email TEXT NOT NULL UNIQUE,
+  name TEXT NOT NULL,
+  role TEXT NOT NULL CHECK (role IN ('student', 'teacher')),
+  password_hash TEXT,
+  created_at TIMESTAMPTZ NOT NULL
+);
+CREATE TABLE IF NOT EXISTS auth_sessions (
+  token_hash TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ NOT NULL,
+  expires_at TIMESTAMPTZ NOT NULL
+);
+CREATE INDEX IF NOT EXISTS auth_sessions_user ON auth_sessions (user_id);
+CREATE INDEX IF NOT EXISTS auth_sessions_expires ON auth_sessions (expires_at);
+CREATE TABLE IF NOT EXISTS classes (
+  id TEXT PRIMARY KEY,
+  teacher_id TEXT NOT NULL REFERENCES users (id),
+  name TEXT NOT NULL,
+  join_code TEXT NOT NULL UNIQUE,
+  created_at TIMESTAMPTZ NOT NULL
+);
+CREATE INDEX IF NOT EXISTS classes_teacher ON classes (teacher_id, created_at);
+CREATE TABLE IF NOT EXISTS enrollments (
+  class_id TEXT NOT NULL REFERENCES classes (id) ON DELETE CASCADE,
+  student_id TEXT NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ NOT NULL,
+  PRIMARY KEY (class_id, student_id)
+);
+CREATE INDEX IF NOT EXISTS enrollments_student ON enrollments (student_id);
+ALTER TABLE lectures ADD COLUMN IF NOT EXISTS owner_id TEXT;
+ALTER TABLE lectures ADD COLUMN IF NOT EXISTS class_id TEXT REFERENCES classes (id);
+CREATE INDEX IF NOT EXISTS lectures_owner ON lectures (owner_id);
+CREATE INDEX IF NOT EXISTS lectures_class ON lectures (class_id);
+CREATE INDEX IF NOT EXISTS sessions_lecture_student ON sessions (lecture_id, student_id);
+`,
+  },
+  {
+    // Pen sizes: the size multiplier each stroke was drawn with (NULL = Medium; lib/toolSizes).
+    version: 4,
+    name: "stroke pen size",
+    sql: `ALTER TABLE strokes ADD COLUMN IF NOT EXISTS size DOUBLE PRECISION;`,
+  },
 ];
+
+const USER_COLS = `id, email, name, role, (password_hash IS NULL) AS guest, created_at`;
+const CLASS_SELECT = `SELECT c.id, c.name, c.teacher_id, u.name AS teacher_name, c.join_code, c.created_at
+  FROM classes c JOIN users u ON u.id = c.teacher_id`;
+/** A lecture is visible to user $1: bundled demo, own, taught or enrolled class. */
+const VISIBLE_TO = `(transcript_source = 'demo' OR owner_id = $1
+  OR class_id IN (SELECT id FROM classes WHERE teacher_id = $1)
+  OR class_id IN (SELECT class_id FROM enrollments WHERE student_id = $1))`;
+/** `col IN (the JSON array of text parameter)`. */
+const inJsonList = (col: string, param: string) => `${col} IN (SELECT jsonb_array_elements_text(${param}::jsonb))`;
 
 /** Applies pending migrations in one transaction, under an advisory lock (idempotent). */
 export async function migrate(driver: SqlDriver): Promise<number[]> {
@@ -482,7 +555,7 @@ const logged = new Set<string>();
 function logOnce(message: string) {
   if (logged.has(message)) return;
   logged.add(message);
-  console.info(`[inkling] ${message}`);
+  console.info(`[traceit] ${message}`);
 }
 
 const errorText = (err: unknown) => (err instanceof Error ? err.message : String(err));
@@ -722,8 +795,15 @@ export class PostgresDb implements Db {
     });
   }
 
-  async sessionStrokeCounts() {
-    return toStrokeCounts(await this.rows<StrokeCountRow>(SESSION_STROKE_COUNTS_SQL));
+  async sessionStrokeCounts(studentId?: string) {
+    const rows =
+      studentId === undefined
+        ? await this.rows<StrokeCountRow>(SESSION_STROKE_COUNTS_SQL)
+        : await this.rows<StrokeCountRow>(
+            sessionStrokeCountsSql(`WHERE session_id IN (SELECT id FROM sessions WHERE student_id = $1)`),
+            [studentId],
+          );
+    return toStrokeCounts(rows);
   }
 
   async upsertStrokes(sessionId: string, strokes: Stroke[]) {
@@ -733,6 +813,7 @@ export class PostgresDb implements Db {
       // Lineage is sticky within a batch too (see the ON CONFLICT clause).
       splitFrom: next.splitFrom ?? prev.splitFrom ?? null,
       replacedBy: next.replacedBy?.length ? next.replacedBy : prev.replacedBy,
+      size: next.size ?? prev.size,
     })).map((s) => ({
       id: s.id,
       start_ms: s.startMs,
@@ -748,6 +829,7 @@ export class PostgresDb implements Db {
       is_scribble: s.isScribble,
       split_from: s.splitFrom ?? null,
       replaced_by: s.replacedBy?.length ? s.replacedBy : null,
+      size: s.size ?? null,
     }));
     const ids = JSON.stringify(records.map((r) => r.id));
     await this.transaction(async () => {
@@ -762,14 +844,14 @@ export class PostgresDb implements Db {
       );
       await this.run(
         `INSERT INTO strokes (id, session_id, start_ms, end_ms, points, pointer_type, bbox, ink_len, median_speed,
-                              erased, erased_at_ms, erased_by, is_scribble, split_from, replaced_by)
+                              erased, erased_at_ms, erased_by, is_scribble, split_from, replaced_by, size)
          SELECT x.id, $1, x.start_ms, x.end_ms, x.points, x.pointer_type, x.bbox, x.ink_len, x.median_speed,
-                x.erased, x.erased_at_ms, x.erased_by, x.is_scribble, x.split_from, x.replaced_by
+                x.erased, x.erased_at_ms, x.erased_by, x.is_scribble, x.split_from, x.replaced_by, x.size
          FROM ${recordsFrom(
            "$2",
            `id text, start_ms float8, end_ms float8, points jsonb, pointer_type text, bbox jsonb, ink_len float8,
             median_speed float8, erased boolean, erased_at_ms float8, erased_by text, is_scribble boolean,
-            split_from text, replaced_by jsonb`,
+            split_from text, replaced_by jsonb, size float8`,
          )}
          ORDER BY e.ord
          ON CONFLICT (id) DO UPDATE SET
@@ -779,7 +861,8 @@ export class PostgresDb implements Db {
            erased_by = EXCLUDED.erased_by, is_scribble = EXCLUDED.is_scribble,
            -- Lineage is sticky: once cut into pieces a stroke stays replaced even if a stale copy is re-sent.
            split_from = COALESCE(EXCLUDED.split_from, strokes.split_from),
-           replaced_by = COALESCE(EXCLUDED.replaced_by, strokes.replaced_by)
+           replaced_by = COALESCE(EXCLUDED.replaced_by, strokes.replaced_by),
+           size = COALESCE(EXCLUDED.size, strokes.size)
          WHERE strokes.session_id = EXCLUDED.session_id`,
         [sessionId, JSON.stringify(records)],
       );
@@ -1064,14 +1147,15 @@ export class PostgresDb implements Db {
   }
 
   private static readonly LECTURE_COLS = `id, course_id, title, media_path, media_type, mime, duration_ms,
-    transcript_source, created_at, jsonb_array_length(transcript) AS word_count`;
+    transcript_source, created_at, jsonb_array_length(transcript) AS word_count, owner_id, class_id,
+    (SELECT c.name FROM classes c WHERE c.id = lectures.class_id) AS class_name`;
 
   async createLecture(input: NewLecture) {
     const id = input.id ?? newId("l_");
     await this.run(
       `INSERT INTO lectures (id, course_id, title, media_path, media_type, mime, duration_ms, transcript,
-                             transcript_source, created_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9, $10)`,
+                             transcript_source, created_at, owner_id, class_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9, $10, $11, $12)`,
       [
         id,
         input.courseId,
@@ -1083,6 +1167,8 @@ export class PostgresDb implements Db {
         JSON.stringify(input.words),
         input.transcriptSource,
         new Date().toISOString(),
+        input.ownerId ?? null,
+        input.classId ?? null,
       ],
     );
     return (await this.getLecture(id))!.lecture;
@@ -1102,7 +1188,13 @@ export class PostgresDb implements Db {
       [id],
     );
     if (!row) return null;
-    return { lecture: toLecture(row), words: JSON.parse(row.transcript) as TranscriptWord[], mediaPath: row.media_path };
+    return {
+      lecture: toLecture(row),
+      words: JSON.parse(row.transcript) as TranscriptWord[],
+      mediaPath: row.media_path,
+      ownerId: row.owner_id ?? null,
+      classId: row.class_id ?? null,
+    };
   }
 
   async setLectureTranscript(id: string, words: TranscriptWord[], source: TranscriptSource) {
@@ -1240,9 +1332,28 @@ export class PostgresDb implements Db {
     }));
   }
 
-  /** Class-wide hotspots: the continuous aggregate on Timescale, else a date_bin rollup. */
-  async lectureInkHotspots(lectureId: string): Promise<InkHotspot[]> {
+  /**
+   * Class-wide hotspots: the continuous aggregate on Timescale, else a date_bin rollup. Filtered by
+   * students: ink_samples joined with their sessions (time_bucket on Timescale, else date_bin).
+   */
+  async lectureInkHotspots(lectureId: string, studentIds?: string[]): Promise<InkHotspot[]> {
     await this.start();
+    if (studentIds) {
+      if (studentIds.length === 0) return [];
+      const bin = this.timescale
+        ? `time_bucket(make_interval(secs => $3::float8 / 1000), i.lecture_ts, $2::timestamptz)`
+        : `date_bin(make_interval(secs => $3::float8 / 1000), i.lecture_ts, $2::timestamptz)`;
+      const filtered = await this.rows<{ bucket_start_ms: number; strokes: number; erased: number; ink_len: number }>(
+        `SELECT round(extract(epoch FROM ${bin} - $2::timestamptz) * 1000)::float8 AS bucket_start_ms,
+                count(*)::int AS strokes, (count(*) FILTER (WHERE i.erased))::int AS erased,
+                sum(i.ink_len)::float8 AS ink_len
+         FROM ink_samples i JOIN sessions s ON s.id = i.session_id
+         WHERE i.lecture_id = $1 AND ${inJsonList("s.student_id", "$4")}
+         GROUP BY 1 ORDER BY 1`,
+        [lectureId, LECTURE_EPOCH_ISO, HOTSPOT_BUCKET_MS, JSON.stringify(studentIds)],
+      );
+      return filtered.map((r) => ({ bucketStartMs: r.bucket_start_ms, strokes: r.strokes, erased: r.erased, inkLen: r.ink_len }));
+    }
     const sql = this.hotspotsAggregate
       ? `SELECT round(extract(epoch FROM bucket - $2::timestamptz) * 1000)::float8 AS bucket_start_ms,
                 strokes::int AS strokes, erased::int AS erased, ink_len::float8 AS ink_len
@@ -1260,6 +1371,169 @@ export class PostgresDb implements Db {
       params,
     );
     return rows.map((r) => ({ bucketStartMs: r.bucket_start_ms, strokes: r.strokes, erased: r.erased, inkLen: r.ink_len }));
+  }
+
+  // ── Accounts ──
+
+  async createUser(input: NewUser): Promise<User | null> {
+    const id = input.id ?? newId("u_");
+    const inserted = await this.run(
+      `INSERT INTO users (id, email, name, role, password_hash, created_at) VALUES ($1, $2, $3, $4, $5, $6)
+       ON CONFLICT DO NOTHING`,
+      [id, normaliseEmail(input.email), input.name, input.role, input.passwordHash, new Date().toISOString()],
+    );
+    return inserted > 0 ? this.getUser(id) : null;
+  }
+
+  async getUser(id: string) {
+    const row = await this.one<UserRow>(`SELECT ${USER_COLS} FROM users WHERE id = $1`, [id]);
+    return row ? toUser(row) : null;
+  }
+
+  async getUserByEmail(email: string) {
+    const row = await this.one<UserRow & { password_hash: string | null }>(
+      `SELECT ${USER_COLS}, password_hash FROM users WHERE email = $1`,
+      [normaliseEmail(email)],
+    );
+    return row ? { user: toUser(row), passwordHash: row.password_hash } : null;
+  }
+
+  async setUserName(id: string, name: string) {
+    await this.run(`UPDATE users SET name = $1 WHERE id = $2`, [name, id]);
+    return this.getUser(id);
+  }
+
+  async countAccounts() {
+    const row = await this.one<{ n: number }>(`SELECT count(*)::int AS n FROM users WHERE password_hash IS NOT NULL`);
+    return Number(row?.n ?? 0);
+  }
+
+  async adoptLegacyData(fromStudentId: string, toUserId: string, keepSessionIds: string[]) {
+    return this.transaction(async () => {
+      const sessions = await this.run(
+        `UPDATE sessions SET student_id = $1 WHERE student_id = $2 AND NOT ${inJsonList("id", "$3")}`,
+        [toUserId, fromStudentId, JSON.stringify(keepSessionIds)],
+      );
+      const lectures = await this.run(
+        `UPDATE lectures SET owner_id = $1 WHERE owner_id IS NULL AND transcript_source <> 'demo'`,
+        [toUserId],
+      );
+      return { sessions, lectures };
+    });
+  }
+
+  async createAuthSession(input: { tokenHash: string; userId: string; expiresAtIso: string }) {
+    await this.run(`INSERT INTO auth_sessions (token_hash, user_id, created_at, expires_at) VALUES ($1, $2, $3, $4)`, [
+      input.tokenHash,
+      input.userId,
+      new Date().toISOString(),
+      input.expiresAtIso,
+    ]);
+  }
+
+  async getAuthSessionUser(tokenHash: string, nowIso: string) {
+    const row = await this.one<UserRow>(
+      `SELECT u.id, u.email, u.name, u.role, (u.password_hash IS NULL) AS guest, u.created_at
+       FROM auth_sessions a JOIN users u ON u.id = a.user_id
+       WHERE a.token_hash = $1 AND a.expires_at > $2::timestamptz`,
+      [tokenHash, nowIso],
+    );
+    return row ? toUser(row) : null;
+  }
+
+  async deleteAuthSession(tokenHash: string) {
+    await this.run(`DELETE FROM auth_sessions WHERE token_hash = $1`, [tokenHash]);
+  }
+
+  async deleteExpiredAuthSessions(nowIso: string) {
+    return this.run(`DELETE FROM auth_sessions WHERE expires_at <= $1::timestamptz`, [nowIso]);
+  }
+
+  // ── Classes ──
+
+  async createClass(input: NewClass): Promise<ClassInfo | null> {
+    const id = input.id ?? newId("c_");
+    const inserted = await this.run(
+      `INSERT INTO classes (id, teacher_id, name, join_code, created_at) VALUES ($1, $2, $3, $4, $5) ON CONFLICT DO NOTHING`,
+      [id, input.teacherId, input.name, input.joinCode, new Date().toISOString()],
+    );
+    return inserted > 0 ? this.getClass(id) : null;
+  }
+
+  async getClass(id: string) {
+    const row = await this.one<ClassRow>(`${CLASS_SELECT} WHERE c.id = $1`, [id]);
+    return row ? toClassInfo(row) : null;
+  }
+
+  async getClassByJoinCode(code: string) {
+    const row = await this.one<ClassRow>(`${CLASS_SELECT} WHERE c.join_code = $1`, [code]);
+    return row ? toClassInfo(row) : null;
+  }
+
+  async listTeacherClasses(teacherId: string) {
+    const rows = await this.rows<ClassRow & { student_count: number; lecture_count: number }>(
+      `SELECT c.id, c.name, c.teacher_id, u.name AS teacher_name, c.join_code, c.created_at,
+              (SELECT count(*)::int FROM enrollments e WHERE e.class_id = c.id) AS student_count,
+              (SELECT count(*)::int FROM lectures l WHERE l.class_id = c.id) AS lecture_count
+       FROM classes c JOIN users u ON u.id = c.teacher_id
+       WHERE c.teacher_id = $1 ORDER BY c.created_at DESC, c.id ${ID_ORDER}`,
+      [teacherId],
+    );
+    return rows.map((r) => ({ ...toClassInfo(r), studentCount: Number(r.student_count), lectureCount: Number(r.lecture_count) }));
+  }
+
+  async listStudentClasses(studentId: string): Promise<StudentClass[]> {
+    const rows = await this.rows<{ id: string; name: string; teacher_name: string }>(
+      `SELECT c.id, c.name, u.name AS teacher_name
+       FROM enrollments e JOIN classes c ON c.id = e.class_id JOIN users u ON u.id = c.teacher_id
+       WHERE e.student_id = $1 ORDER BY e.created_at, c.id ${ID_ORDER}`,
+      [studentId],
+    );
+    return rows.map((r) => ({ id: r.id, name: r.name, teacherName: r.teacher_name }));
+  }
+
+  async enroll(classId: string, studentId: string) {
+    const inserted = await this.run(
+      `INSERT INTO enrollments (class_id, student_id, created_at) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`,
+      [classId, studentId, new Date().toISOString()],
+    );
+    return inserted > 0;
+  }
+
+  async listClassStudentIds(classId: string) {
+    const rows = await this.rows<{ student_id: string }>(
+      `SELECT student_id FROM enrollments WHERE class_id = $1 ORDER BY created_at, student_id ${ID_ORDER}`,
+      [classId],
+    );
+    return rows.map((r) => r.student_id);
+  }
+
+  // ── Lecture visibility ──
+
+  async listVisibleLectures(userId: string): Promise<Lecture[]> {
+    const rows = await this.rows<LectureRow>(
+      `SELECT ${PostgresDb.LECTURE_COLS} FROM lectures WHERE ${VISIBLE_TO}
+       ORDER BY (transcript_source = 'demo') DESC, created_at DESC, id ${ID_ORDER}`,
+      [userId],
+    );
+    return rows.map(toLecture);
+  }
+
+  async canViewLecture(userId: string, lectureId: string) {
+    return !!(await this.one(`SELECT 1 AS ok FROM lectures WHERE id = $2 AND ${VISIBLE_TO}`, [userId, lectureId]));
+  }
+
+  async setLectureClass(lectureId: string, classId: string | null) {
+    return (await this.run(`UPDATE lectures SET class_id = $1 WHERE id = $2`, [classId, lectureId])) > 0;
+  }
+
+  async listLectureSessions(lectureId: string, studentIds: string[]) {
+    const rows = await this.rows<SessionRow>(
+      `SELECT * FROM sessions WHERE lecture_id = $1 AND ${inJsonList("student_id", "$2")}
+       ORDER BY created_at_iso, id ${ID_ORDER}`,
+      [lectureId, JSON.stringify(studentIds)],
+    );
+    return rows.map(toSession);
   }
 }
 

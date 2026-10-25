@@ -1,7 +1,8 @@
 "use client";
 
-// Capture-page reminder of gaps left open in earlier sessions of this lecture, with "Jump to"
-// buttons that seek the lecture to the start of each gap's sentence. Dismissible.
+// Capture-page reminder of what is still fuzzy (gaps left open) from earlier sessions of this
+// lecture, with "Jump to" buttons that seek the lecture to the start of each gap's sentence.
+// Dismissible. A white card floating over the page's lower-right corner.
 import { useState, type RefObject } from "react";
 import type { ProgressThread } from "@/lib/progress";
 import { formatClock } from "./LecturePlayer";
@@ -32,19 +33,19 @@ export default function OpenGapsBanner({
     <aside
       data-testid="open-gaps-banner"
       aria-labelledby="open-gaps-title"
-      className="enter-soft absolute right-4 bottom-4 z-10 flex w-[min(24rem,calc(100%-2rem))] flex-col gap-2 rounded-lg border border-line bg-chrome/95 py-2.5 pr-1.5 pl-3.5 shadow-page"
+      className="enter-soft absolute right-3 bottom-3 z-10 flex w-[min(24rem,calc(100%-1.5rem))] flex-col gap-2 rounded-[18px] border border-line bg-chrome/95 py-2.5 pr-1.5 pl-4 shadow-lift sm:right-4 sm:bottom-4 sm:w-[min(24rem,calc(100%-2rem))]"
     >
       <div className="flex items-start gap-2">
         <p id="open-gaps-title" className="flex-1 pt-2.5 text-sm font-semibold text-balance text-ink">
-          You have <span className="tabular-nums" data-testid="open-gaps-banner-count">{n}</span> open{" "}
-          {n === 1 ? "gap" : "gaps"} in this lecture
+          <span className="tabular-nums" data-testid="open-gaps-banner-count">{n}</span> {n === 1 ? "fuzzy spot" : "fuzzy spots"}{" "}
+          in this lecture {n === 1 ? "is" : "are"} <span className="font-bold text-gap-strong">left over from last time</span>
         </p>
         <button
           type="button"
           data-testid="open-gaps-dismiss"
           onClick={() => setDismissed(true)}
-          aria-label="Dismiss open gaps"
-          className="press inline-flex size-11 shrink-0 items-center justify-center rounded-md text-ink-muted hover:bg-chrome-hover hover:text-ink"
+          aria-label="Dismiss still fuzzy reminder"
+          className="press inline-flex size-11 shrink-0 items-center justify-center rounded-[12px] text-ink-muted hover:bg-desk hover:text-ink"
         >
           <CloseIcon size={16} />
         </button>
@@ -59,14 +60,14 @@ export default function OpenGapsBanner({
               onClick={() => {
                 if (mediaRef.current) seek(mediaRef.current, t.seekMs);
               }}
-              className="press group -ml-2 flex min-h-11 w-[calc(100%+0.5rem)] items-center gap-2.5 rounded-md px-2 py-1.5 text-left text-sm hover:bg-chrome-hover"
+              className="press group -ml-2 flex min-h-11 w-[calc(100%+0.5rem)] items-center gap-2.5 rounded-md px-2 py-1.5 text-left text-sm hover:bg-gap-soft/60"
             >
               <MomentGlyph type="unresolved_gap" size={12} className="shrink-0" />
-              <span className="line-clamp-2 min-w-0 flex-1 text-pretty text-ink">{t.label}</span>
+              <span className="line-clamp-2 min-w-0 flex-1 text-pretty font-medium text-ink">{t.label}</span>
               {t.occurrences > 1 ? (
-                <span className="shrink-0 text-xs text-gap-strong tabular-nums">×{t.occurrences}</span>
+                <span className="shrink-0 text-xs font-bold text-gap-strong tabular-nums">×{t.occurrences}</span>
               ) : null}
-              <span className="shrink-0 font-mono text-xs tabular-nums text-ink-subtle group-hover:text-accent">
+              <span className="shrink-0 rounded-pill bg-desk px-2 py-0.5 font-mono text-xs tabular-nums text-ink-muted group-hover:bg-accent-soft group-hover:text-accent">
                 Jump to {formatClock(t.latest.lectureMs)}
               </span>
             </button>

@@ -8,7 +8,7 @@ import { cropToPng } from "./cropImage";
 type ReadState = "idle" | "loading" | "error";
 
 /**
- * "What you changed: … → …" and the likely misconception, read by a vision model from the same
+ * "Your edit: … → …" and the likely mistake behind it, read by a vision model from the same
  * before/after crops the panel shows. Read once per revision (stored on the server); quiet on
  * failure or without a provider.
  */
@@ -63,10 +63,10 @@ export default function RevisionReading({
 
   if (vision) {
     return (
-      <div data-testid="revision-reading" data-cosmetic={vision.cosmetic} className="enter-soft flex flex-col gap-1.5 text-sm text-pretty">
+      <div data-testid="revision-reading" data-cosmetic={vision.cosmetic} className="enter-soft flex flex-col gap-2.5 text-[15px] leading-relaxed text-pretty">
         <p className="text-ink">
-          <span className="font-semibold">What you changed: </span>
-          <span data-testid="revision-before" className="text-ink-muted line-through decoration-ghost/70">
+          <b className="font-bold">Your edit: </b>
+          <span data-testid="revision-before" className="text-ink-subtle line-through decoration-ghost/70">
             {vision.before}
           </span>
           <span aria-hidden="true" className="px-1.5 text-ink-subtle">
@@ -76,10 +76,12 @@ export default function RevisionReading({
           <span data-testid="revision-after">{vision.after}</span>
         </p>
         {vision.cosmetic ? (
-          <p className="text-xs text-ink-subtle">Looks like a tidy-up, not a misconception — it’ll drop off the timeline next time this session is analysed.</p>
+          <p className="text-[13px] text-ink-subtle">
+            Looks like a tidy-up, not a slip — it’ll drop off your learning trail next time this session is analyzed.
+          </p>
         ) : vision.misconception ? (
-          <p data-testid="revision-misconception" className="text-ink-muted">
-            <span className="text-ink-subtle">Likely mix-up: </span>
+          <p data-testid="revision-misconception" className="rounded-[12px] bg-chrome-hover px-3.5 py-3 text-ink-muted">
+            <b className="font-bold text-ink">Likely mistake: </b>
             {vision.misconception}
           </p>
         ) : null}
@@ -88,8 +90,8 @@ export default function RevisionReading({
   }
   if (state === "loading") {
     return (
-      <p data-testid="revision-reading-loading" aria-live="polite" className="flex items-center gap-2 text-xs text-ink-subtle">
-        <span aria-hidden="true" className="h-2 w-24 rounded-pill bg-line motion-safe:animate-pulse" />
+      <p data-testid="revision-reading-loading" aria-live="polite" className="flex items-center gap-2 text-[13px] text-ink-subtle">
+        <span aria-hidden="true" className="h-2 w-24 rounded-pill bg-accent-soft motion-safe:animate-pulse" />
         Reading your handwriting…
       </p>
     );

@@ -74,6 +74,14 @@ describe('detectStrikeThrough', () => {
     expect(detectStrikeThrough(mk(linePoints(135, 50, 165, 50, 5000)), [vertical])).toEqual([]);
   });
 
+  it('an x-axis drawn across a tall mark (a y-axis, a big "t" by mouse) is not a strike-through', () => {
+    // The shapes from a real mouse session: a 26×119 px upright stroke, then a flat 117 px line.
+    const axis = mk(linePoints(150, 0, 176, 119, 1000, 0), 'w-axis');
+    expect(detectStrikeThrough(mk(linePoints(100, 60, 217, 60, 5000, 0)), [axis])).toEqual([]);
+    const tallish = mk(linePoints(150, 10, 193, 90, 1000, 0), 'w-tall'); // 43×80
+    expect(detectStrikeThrough(mk(linePoints(140, 50, 214, 50, 5000, 0)), [tallish])).toEqual([]);
+  });
+
   it('only live ink can be struck; several strokes of one word are struck together', () => {
     const a = mk(wordPoints(100, 150, 50, 1000), 'w-a');
     const b = mk(wordPoints(156, 200, 50, 1800), 'w-b');

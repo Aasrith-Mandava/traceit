@@ -1,12 +1,15 @@
 import { after } from "next/server";
 import { aiService } from "@/lib/ai/service";
 import { analyzeSession } from "@/lib/analyze";
+import { notFoundJson, ownedSession } from "@/lib/access";
+import { withUser } from "@/lib/auth/core";
 import { sameOriginOnly } from "@/lib/http";
 
 /** Runs (or re-runs) the analysis pipeline for a session. Idempotent: same ink → same event ids. */
-export const POST = sameOriginOnly(async (req: Request, ctx: RouteContext<"/api/sessions/[id]/analyze">) => {
+export const POST = sameOriginOnly(withUser(async (req, user, ctx: RouteContext<"/api/sessions/[id]/analyze">) => {
   const headers = req.headers;
   const { id } = await ctx.params;
+  if (!(await ownedSession(user, id))) return notFoundJson("session");
   try {
     const result = await analyzeSession(id);
     if (!result) return Response.json({ error: "session not found" }, { status: 404 });
@@ -26,4 +29,4 @@ export const POST = sameOriginOnly(async (req: Request, ctx: RouteContext<"/api/
     console.error(`analyze failed for session ${id}`, err);
     return Response.json({ error: "Could not analyze this session.", sessionId: id }, { status: 500 });
   }
-});
+}));

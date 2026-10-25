@@ -1,16 +1,16 @@
 "use client";
 
 import { useRef, useState, type KeyboardEvent, type PointerEvent, type ReactNode } from "react";
-import Link from "next/link";
 import type { NotabilityImport, Session, Stroke, TimelineData, TimelineEventType } from "@/lib/types";
 import { DEFAULT_REVEAL, hiddenStats, revealAt, revealForKey } from "@/lib/compare";
+import { MOMENT_META } from "@/lib/moments";
 import { notabilityFileUrl } from "@/lib/notability";
 import { PageNav, PdfPage, usePdfDocument, type PageRect, type PdfDocState } from "./NotabilityPdf";
 import { NotabilityDropzone, ReplacePdfButton, UploadError, useNotabilityUpload } from "./NotabilityUpload";
 import ProcessView from "./ProcessView";
 import { MomentGlyph } from "./Timeline";
 import { ChevronLeftIcon, ChevronRightIcon, DocumentIcon } from "./icons";
-import { Mark, TopBar, btnSecondary, iconBtn } from "./ui";
+import { BackLink, Mark, TopBar, btnSecondary } from "./ui";
 import { useSessionTimeline } from "./useSessionTimeline";
 
 type Mode = "side" | "overlay";
@@ -26,22 +26,42 @@ interface Props {
   pdfUploadAvailable?: boolean;
 }
 
-const MOMENT_STATS: Array<{ key: "corrections" | "gaps" | "breakthroughs"; type: TimelineEventType; one: string; many: string; testId: string }> = [
-  { key: "corrections", type: "misconception_corrected", one: "correction", many: "corrections", testId: "hidden-corrections" },
-  { key: "gaps", type: "unresolved_gap", one: "unresolved gap", many: "unresolved gaps", testId: "hidden-gaps" },
-  { key: "breakthroughs", type: "breakthrough", one: "breakthrough", many: "breakthroughs", testId: "hidden-breakthroughs" },
+const MOMENT_STATS: Array<{ key: "corrections" | "gaps" | "breakthroughs"; type: TimelineEventType; testId: string }> = [
+  { key: "corrections", type: "misconception_corrected", testId: "hidden-corrections" },
+  { key: "gaps", type: "unresolved_gap", testId: "hidden-gaps" },
+  { key: "breakthroughs", type: "breakthrough", testId: "hidden-breakthroughs" },
 ];
 
-function HiddenStat({ value, label, testId, icon }: { value: number | null; label: string; testId: string; icon: ReactNode }) {
+// Literal class names per chip so Tailwind generates them (same chips as the study-mode summary).
+const CHIP_CLASS: Record<"ghost" | TimelineEventType, string> = {
+  ghost: "border border-dashed border-ghost bg-ghost-soft text-accent-strong",
+  misconception_corrected: "bg-corrected-soft font-semibold text-corrected-strong",
+  unresolved_gap: "bg-gap-soft font-semibold text-gap-strong",
+  breakthrough: "bg-breakthrough-soft font-semibold text-breakthrough-strong",
+};
+
+function HiddenStat({
+  value,
+  label,
+  testId,
+  icon,
+  tone,
+}: {
+  value: number | null;
+  label: string;
+  testId: string;
+  icon: ReactNode;
+  tone: "ghost" | TimelineEventType;
+}) {
   return (
-    <li className="flex min-h-11 items-center gap-2.5 rounded-pill border border-line bg-chrome px-3.5 py-1.5 shadow-[0_1px_2px_rgb(15_23_42/0.04)]">
+    <li className={`flex min-h-11 items-center gap-2 rounded-[14px] px-3.5 py-1.5 text-sm ${CHIP_CLASS[tone]}`}>
       <span aria-hidden="true" className="inline-flex w-4 justify-center">
         {icon}
       </span>
-      <span data-testid={testId} className="text-xl leading-none font-extrabold tracking-tight tabular-nums text-ink">
+      <span data-testid={testId} className="font-display text-xl leading-none font-bold tabular-nums">
         {value ?? "–"}
       </span>
-      <span className="text-sm leading-tight text-ink-muted">{label}</span>
+      <span className="leading-tight">{label}</span>
     </li>
   );
 }
@@ -68,7 +88,7 @@ function ModeToggle({ mode, onChange, overlayDisabled }: { mode: Mode; onChange:
       data-testid="compare-mode"
       data-mode={mode}
       onKeyDown={onKeyDown}
-      className="inline-flex gap-0.5 rounded-pill border border-line bg-chrome-press/70 p-0.5"
+      className="inline-flex gap-1 rounded-[14px] border border-line bg-desk p-1"
     >
       {options.map((o) => {
         const checked = mode === o.value;
@@ -87,8 +107,8 @@ function ModeToggle({ mode, onChange, overlayDisabled }: { mode: Mode; onChange:
             title={disabled ? "Upload a Notability PDF first" : undefined}
             data-testid={`mode-${o.value}`}
             onClick={() => onChange(o.value)}
-            className={`press inline-flex min-h-11 items-center rounded-pill px-4 text-sm font-semibold whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-50 ${
-              checked ? "bg-ink text-white shadow-raised" : "text-ink-muted hover:bg-chrome hover:text-ink"
+            className={`press inline-flex min-h-11 items-center rounded-[11px] px-4 text-[15px] font-bold whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-50 ${
+              checked ? "bg-accent text-on-accent shadow-primary" : "text-ink-muted hover:bg-chrome hover:text-ink"
             }`}
           >
             {o.label}
@@ -99,16 +119,16 @@ function ModeToggle({ mode, onChange, overlayDisabled }: { mode: Mode; onChange:
   );
 }
 
-/** A titled card holding one side of the comparison. */
+/** A titled white card holding one side of the comparison. */
 function Panel({ title, note, actions, children, labelId }: { title: string; note: ReactNode; actions?: ReactNode; children: ReactNode; labelId: string }) {
   return (
-    <section aria-labelledby={labelId} className="flex min-h-[440px] min-w-0 flex-col overflow-hidden rounded-lg border border-line bg-chrome shadow-card">
-      <header className="flex min-h-12 shrink-0 flex-wrap items-center justify-between gap-x-3 gap-y-1 border-b border-line px-3.5 py-1.5">
-        <div className="flex min-w-0 flex-col">
-          <h2 id={labelId} className="truncate text-sm font-bold tracking-tight text-ink">
+    <section aria-labelledby={labelId} className="flex min-h-[440px] min-w-0 flex-col overflow-hidden rounded-[20px] border border-line bg-chrome shadow-card">
+      <header className="flex min-h-14 shrink-0 flex-wrap items-center justify-between gap-x-3 gap-y-1 border-b border-line px-4 py-2">
+        <div className="flex min-w-0 flex-col gap-0.5">
+          <h2 id={labelId} className="truncate font-display text-base leading-tight font-bold text-ink">
             {title}
           </h2>
-          <p className="truncate text-xs text-ink-subtle">{note}</p>
+          <p className="truncate text-[13px] text-ink-subtle">{note}</p>
         </div>
         {actions}
       </header>
@@ -131,22 +151,22 @@ function FinalPage({
 }) {
   if (pdf.status === "idle") {
     return (
-      <div className="absolute inset-0 overflow-y-auto bg-desk/60">
+      <div className="absolute inset-0 overflow-y-auto bg-chrome-hover">
         <NotabilityDropzone upload={upload.upload} state={upload.state} available={upload.available} />
       </div>
     );
   }
   if (pdf.status === "loading") {
     return (
-      <p role="status" data-testid="notability-loading" className="absolute inset-0 flex items-center justify-center gap-2 bg-desk/60 text-sm text-ink-muted">
-        <span aria-hidden="true" className="size-1.5 animate-pulse rounded-pill bg-accent" />
+      <p role="status" data-testid="notability-loading" className="absolute inset-0 flex items-center justify-center gap-2 bg-chrome-hover text-sm font-semibold text-ink-muted">
+        <span aria-hidden="true" className="size-2 animate-pulse rounded-pill bg-accent" />
         Opening your PDF…
       </p>
     );
   }
   if (pdf.status === "error") {
     return (
-      <div className="absolute inset-0 overflow-y-auto bg-desk/60">
+      <div className="absolute inset-0 overflow-y-auto bg-chrome-hover">
         <NotabilityDropzone upload={upload.upload} state={upload.state} available={upload.available} title="This PDF can’t be shown">
           <p role="alert" data-testid="notability-error" data-kind={pdf.kind} className="text-sm text-pretty text-danger">
             {pdf.message}
@@ -155,7 +175,7 @@ function FinalPage({
       </div>
     );
   }
-  return <PdfPage doc={pdf.doc} pageNumber={page} className="bg-desk/60" onPageRect={onPageRect} />;
+  return <PdfPage doc={pdf.doc} pageNumber={page} className="bg-chrome-hover" onPageRect={onPageRect} />;
 }
 
 /**
@@ -213,7 +233,7 @@ function OverlayStage({
       ref={stageRef}
       data-testid="compare-stage"
       data-reveal={reveal}
-      className="relative min-h-[480px] flex-1 overflow-hidden rounded-lg border border-line bg-chrome shadow-card"
+      className="relative min-h-[480px] flex-1 overflow-hidden rounded-[20px] border border-line bg-chrome shadow-card"
     >
       <div className="absolute inset-0">{renderFinalPage(setPageRect)}</div>
       <div
@@ -226,15 +246,15 @@ function OverlayStage({
 
       <span
         aria-hidden="true"
-        className={`pointer-events-none absolute top-3 left-3 z-10 rounded-pill bg-ink/85 px-2.5 py-1 text-xs font-semibold text-paper transition-opacity duration-150 ${
+        className={`pointer-events-none absolute top-3 left-3 z-10 rounded-pill bg-night/90 px-3 py-1 text-xs font-bold text-white transition-opacity duration-150 ${
           reveal > 3 ? "opacity-100" : "opacity-0"
         }`}
       >
-        ← Inkling — the process
+        ← TraceIt — the process
       </span>
       <span
         aria-hidden="true"
-        className={`pointer-events-none absolute top-3 right-3 z-10 rounded-pill border border-line bg-chrome/95 px-2.5 py-1 text-xs font-semibold text-ink-muted transition-opacity duration-150 ${
+        className={`pointer-events-none absolute top-3 right-3 z-10 rounded-pill border border-line bg-chrome/95 px-3 py-1 text-xs font-bold text-ink-muted transition-opacity duration-150 ${
           reveal < 97 ? "opacity-100" : "opacity-0"
         }`}
       >
@@ -267,10 +287,10 @@ function OverlayStage({
             : { left: `${reveal}%`, top: 0, bottom: 0 }),
         }}
       >
-        <span aria-hidden="true" className="h-full w-0.5 bg-ink/80 shadow-[0_0_0_1px_rgb(255_255_255/0.7)]" />
+        <span aria-hidden="true" className="h-full w-0.5 bg-accent shadow-[0_0_0_1px_rgb(255_255_255/0.7)]" />
         <span
           aria-hidden="true"
-          className="absolute top-1/2 inline-flex h-11 w-9 -translate-y-1/2 items-center justify-center rounded-pill border border-line-strong bg-chrome text-ink shadow-raised transition-[transform,box-shadow] duration-150 group-hover:scale-105 group-focus-visible:shadow-[var(--focus-ring)] group-active:scale-95"
+          className="absolute top-1/2 inline-flex h-11 w-9 -translate-y-1/2 items-center justify-center rounded-pill border-[1.5px] border-accent bg-chrome text-accent shadow-raised transition-[transform,box-shadow] duration-150 group-hover:scale-105 group-focus-visible:shadow-[var(--focus-ring)] group-active:scale-95"
         >
           <ChevronLeftIcon size={14} className="-mr-1" />
           <ChevronRightIcon size={14} className="-ml-1" />
@@ -313,16 +333,15 @@ export default function CompareView({ session, strokes, initialTimeline, initial
   return (
     <div className="flex min-h-dvh flex-col">
       <TopBar label="Compare toolbar">
-        <div className="flex min-w-[10rem] flex-1 items-center gap-1">
-          <Link href={`/review/${encodeURIComponent(session.id)}`} aria-label="Back to review" className={iconBtn}>
-            <ChevronLeftIcon size={22} />
-          </Link>
-          <div className="min-w-0">
-            <p className="truncate text-xs font-bold tracking-wide text-accent-press uppercase">Compare with Notability</p>
-            <h1 className="truncate text-base leading-tight font-bold tracking-tight text-ink">{session.title}</h1>
+        <div className="flex min-w-0 flex-[1_1_16rem] items-center gap-2.5">
+          {/* Back to wherever the student came from; reached by URL alone, back to this session's Study mode. */}
+          <BackLink fallbackHref={`/review/${encodeURIComponent(session.id)}`} />
+          <div className="flex min-w-0 flex-col">
+            <p className="truncate text-[11px] font-extrabold tracking-[0.12em] text-accent uppercase">Compare with Notability</p>
+            <h1 className="truncate font-display text-[19px] leading-tight font-bold text-ink">{session.title}</h1>
           </div>
         </div>
-        <div className="ml-auto flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2.5">
           {effectiveMode === "overlay" ? pageNav : null}
           <ModeToggle mode={effectiveMode} onChange={setMode} overlayDisabled={!overlayReady} />
           {current ? <ReplacePdfButton upload={upload.upload} state={upload.state} available={upload.available} /> : null}
@@ -334,27 +353,29 @@ export default function CompareView({ session, strokes, initialTimeline, initial
         data-testid="hidden-stats"
         data-status={status}
         aria-busy={!ready}
-        className="flex shrink-0 flex-wrap items-center gap-x-6 gap-y-2.5 border-b border-line bg-desk px-3 py-3 sm:px-4"
+        className="flex shrink-0 flex-wrap items-center gap-x-6 gap-y-3 px-2 pt-5 sm:px-4 lg:px-6"
       >
-        <div className="flex min-w-0 flex-col">
-          <h2 id="hidden-heading" className="text-2xl leading-tight font-extrabold tracking-[-0.03em] text-balance text-ink">
+        <div className="flex min-w-0 flex-col gap-1">
+          <h2 id="hidden-heading" className="font-display text-2xl leading-tight font-extrabold tracking-[-0.03em] text-balance text-ink sm:text-[28px]">
             What the final page <Mark>hides</Mark>
           </h2>
-          <p className="mt-1 text-sm text-pretty text-ink-muted">Notability keeps the final page. Here’s what it hides.</p>
+          <p className="text-[15px] text-pretty text-ink-muted">Notability keeps the final page. Here’s what it hides.</p>
         </div>
-        <ul aria-label="Hidden by the final page" className="flex flex-wrap gap-2">
+        <ul aria-label="Hidden by the final page" className="flex flex-wrap gap-2.5">
           <HiddenStat
             value={stats.erased}
-            label={plural(stats.erased, "erased piece kept", "erased pieces kept")}
+            label={plural(stats.erased, "ghost saved", "ghosts saved")}
             testId="hidden-erased"
+            tone="ghost"
             icon={<span className="inline-block w-4 border-t-2 border-dashed border-ghost" />}
           />
           {MOMENT_STATS.map((m) => (
             <HiddenStat
               key={m.key}
               value={ready ? stats[m.key] : null}
-              label={plural(stats[m.key], m.one, m.many)}
+              label={plural(stats[m.key], MOMENT_META[m.type].plural[0], MOMENT_META[m.type].plural[1])}
               testId={m.testId}
+              tone={m.type}
               icon={<MomentGlyph type={m.type} size={14} />}
             />
           ))}
@@ -371,26 +392,26 @@ export default function CompareView({ session, strokes, initialTimeline, initial
             <DocumentIcon size={16} />
             Export for Notability (PDF)
           </a>
-          <p id="export-hint" className="max-w-[19rem] text-xs text-pretty text-ink-subtle sm:text-right">
+          <p id="export-hint" className="max-w-[19rem] text-[13px] text-pretty text-ink-subtle sm:text-right">
             Import this PDF into Notability to keep your process next to your notes.
           </p>
         </div>
         {status === "error" ? (
           <p role="alert" className="text-sm text-danger">
-            Couldn’t analyze this session — open the review to try again.
+            Couldn’t read this session — open study mode to try again.
           </p>
         ) : null}
       </section>
 
       {current && upload.state.status === "error" ? (
-        <div className="shrink-0 border-b border-line bg-gap-soft/60 px-3 py-2 sm:px-4">
+        <div className="mx-2 mt-4 shrink-0 rounded-[14px] bg-gap-soft px-4 py-2.5 sm:mx-4 lg:mx-6">
           <UploadError state={upload.state} />
         </div>
       ) : null}
 
-      <main className="flex min-h-0 flex-1 flex-col p-3 sm:p-4">
+      <main className="flex min-h-0 flex-1 flex-col px-2 pt-4 pb-7 sm:px-4 lg:px-6">
         {effectiveMode === "side" ? (
-          <div data-testid="compare-side" className="grid flex-1 grid-cols-1 gap-3 sm:gap-4 md:grid-cols-2 md:grid-rows-1">
+          <div data-testid="compare-side" className="grid flex-1 grid-cols-1 gap-4 md:grid-cols-2 md:grid-rows-1">
             <Panel
               labelId="final-heading"
               title="Notability — final page"
@@ -401,11 +422,11 @@ export default function CompareView({ session, strokes, initialTimeline, initial
             </Panel>
             <Panel
               labelId="process-heading"
-              title="Inkling — the process"
+              title="TraceIt — the process"
               note={
                 <span className="inline-flex items-center gap-1.5">
                   <span aria-hidden="true" className="inline-block w-3 border-t-2 border-dashed border-ghost" />
-                  Ghost ink = erased, kept · tap a moment to open it
+                  Faded = what you rubbed out · tap a moment to open it
                 </span>
               }
             >

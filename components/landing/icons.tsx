@@ -24,27 +24,28 @@ function Svg({ size = 20, children, ...rest }: IconProps) {
   );
 }
 
-/** Inkling mark: an ink drop resting on a dashed "ghost" rule (colours come from the theme tokens). */
-export function InklingMark({ size = 28, className = "" }: { size?: number; className?: string }) {
+/** TraceIt mark: a pen trace (its start faded to dotted ghost ink) ending at a lime spot — the moment it caught. */
+export function TraceItMark({ size = 28, className = "" }: { size?: number; className?: string }) {
   return (
     <svg width={size} height={size} viewBox="0 0 32 32" aria-hidden="true" focusable="false" className={className}>
-      <path d="M16 2.5c-1.2 3.6-8 9.6-8 15a8 8 0 0 0 16 0c0-5.4-6.8-11.4-8-15Z" fill="var(--color-ink)" />
+      <rect x="1" y="1" width="30" height="30" rx="9" fill="var(--color-accent)" />
       <path
-        d="M12.4 18.2a3.8 3.8 0 0 0 3 3.9"
+        d="M6.6 23.4c1.7-.5 3-1.6 4-3.1"
         fill="none"
-        stroke="var(--color-paper)"
-        strokeWidth="1.7"
+        stroke="var(--color-accent-line)"
+        strokeWidth="2.4"
         strokeLinecap="round"
-        opacity=".75"
+        strokeDasharray=".1 3.4"
       />
       <path
-        d="M3 29.5h26"
+        d="M11.4 19.6c1.5-2.8 2.4-6.6 5-6.6 2.6 0 2 5.9 4.7 5.9 1.4 0 2.3-1.4 2.9-3"
         fill="none"
-        stroke="var(--color-ghost)"
-        strokeWidth="2"
+        stroke="#fff"
+        strokeWidth="2.6"
         strokeLinecap="round"
-        strokeDasharray="3 3"
+        strokeLinejoin="round"
       />
+      <circle cx="24.4" cy="11.6" r="3.2" fill="var(--color-highlight)" />
     </svg>
   );
 }
@@ -65,6 +66,12 @@ export const PauseIcon = (p: IconProps) => (
 export const ArrowUpRightIcon = (p: IconProps) => (
   <Svg {...p}>
     <path d="M7 17 17 7M8 7h9v9" />
+  </Svg>
+);
+
+export const ArrowRightIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M5 12h14M13 6l6 6-6 6" />
   </Svg>
 );
 
@@ -110,19 +117,57 @@ export const SparkIcon = (p: IconProps) => (
   </Svg>
 );
 
-/** A dashed stroke — Inkling's "ghost ink" glyph. */
+/** A dashed stroke — TraceIt's "ghost ink" glyph. */
 export const GhostInkIcon = (p: IconProps) => (
   <Svg {...p}>
     <path d="M3.5 16c3-6 5.5-8 8-5s5 1 9-5" strokeDasharray="3.2 3" />
   </Svg>
 );
 
-export const TimelineIcon = (p: IconProps) => (
-  <Svg {...p}>
-    <path d="M3 12h18" />
-    <circle cx="7" cy="12" r="2" fill="var(--color-paper)" />
-    <path d="m13 10 2 2-2 2-2-2Z" fill="var(--color-paper)" />
-    <circle cx="19" cy="12" r="1.2" />
+/* ───────── "What's inside" card icons (the artboard's set) ───────── */
+
+/** A pen drawn in dashes: ghost ink. */
+export const GhostPenIcon = (p: IconProps) => (
+  <Svg strokeWidth={2} {...p}>
+    <path d="M4 20l4-1L19 8l-3-3L5 16z" strokeDasharray="3 3" />
+  </Svg>
+);
+
+/** A pulse line: the learning trail. */
+export const PulseIcon = (p: IconProps) => (
+  <Svg strokeWidth={2} {...p}>
+    <path d="M3 12h4l3-7 4 14 3-7h4" />
+  </Svg>
+);
+
+/** A question in a circle: the quick self-test. */
+export const QuestionIcon = (p: IconProps) => (
+  <Svg strokeWidth={2} {...p}>
+    <circle cx="12" cy="12" r="9" />
+    <path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6v.6M12 17v.01" />
+  </Svg>
+);
+
+/** A speaker: hear it again. */
+export const SpeakerIcon = (p: IconProps) => (
+  <Svg strokeWidth={2} {...p}>
+    <path d="M11 5 6 9H3v6h3l5 4z" />
+    <path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13" />
+  </Svg>
+);
+
+/** Two pages side by side: Notability. */
+export const SplitIcon = (p: IconProps) => (
+  <Svg strokeWidth={2} {...p}>
+    <rect x="3" y="4" width="18" height="16" rx="2" />
+    <path d="M12 4v16" />
+  </Svg>
+);
+
+/** Bars: growth. */
+export const BarsIcon = (p: IconProps) => (
+  <Svg strokeWidth={2} {...p}>
+    <path d="M4 20V10M10 20V4M16 20v-7M22 20H2" />
   </Svg>
 );
 
@@ -133,44 +178,11 @@ export const FlaskIcon = (p: IconProps) => (
   </Svg>
 );
 
-export const GlobeVoiceIcon = (p: IconProps) => (
-  <Svg {...p}>
-    <circle cx="10" cy="12" r="7" />
-    <path d="M3 12h14M10 5c2 2.2 2.8 4.5 2.8 7s-.8 4.8-2.8 7c-2-2.2-2.8-4.5-2.8-7S8 7.2 10 5Z" />
-    <path d="M19.5 9.5c.7.7 1 1.5 1 2.5s-.3 1.8-1 2.5" />
-  </Svg>
-);
-
-export const ClassIcon = (p: IconProps) => (
-  <Svg {...p}>
-    <circle cx="8" cy="8" r="2.6" />
-    <circle cx="16.5" cy="9" r="2.1" />
-    <path d="M3.5 18.5c.6-3 2.3-4.6 4.5-4.6s3.9 1.6 4.5 4.6M13.5 14.2c.9-.5 1.9-.7 3-.7 2 0 3.4 1.5 4 4" />
-  </Svg>
-);
-
-export const CompareIcon = (p: IconProps) => (
-  <Svg {...p}>
-    <rect x="3.5" y="4" width="17" height="16" rx="1.5" />
-    <path d="M12 4v16" />
-    <path d="M6.5 9h3M6.5 12h3M14.5 9h3" />
-    <path d="M14.5 12h3" strokeDasharray="1.6 1.6" />
-  </Svg>
-);
-
 export const StudentIcon = (p: IconProps) => (
   <Svg {...p}>
     <path d="m2.5 9 9.5-4.5L21.5 9 12 13.5Z" />
     <path d="M6.5 11v4.5c1.6 1.5 3.4 2.2 5.5 2.2s3.9-.7 5.5-2.2V11" />
     <path d="M21.5 9v5" />
-  </Svg>
-);
-
-export const TeacherIcon = (p: IconProps) => (
-  <Svg {...p}>
-    <rect x="3" y="4" width="18" height="12" rx="1.5" />
-    <path d="M7 12l3-3 2.5 2L17 7.5" />
-    <path d="M9 20h6M12 16v4" />
   </Svg>
 );
 

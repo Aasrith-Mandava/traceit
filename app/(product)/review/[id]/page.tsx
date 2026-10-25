@@ -1,6 +1,8 @@
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { aiService } from "@/lib/ai/service";
+import { ownedSession } from "@/lib/access";
+import { requireUser } from "@/lib/auth/server";
 import { getDb } from "@/lib/db";
 import { getTimeline } from "@/lib/analyze";
 import { getLectureGaps } from "@/lib/gaps";
@@ -9,15 +11,16 @@ import ReviewView from "@/components/ReviewView";
 
 export default async function ReviewPage(props: PageProps<"/review/[id]">) {
   const [{ id }, searchParams] = await Promise.all([props.params, props.searchParams]);
+  const user = await requireUser(`/review/${encodeURIComponent(id)}`);
   const db = getDb();
-  const session = await db.getSession(id);
+  const session = await ownedSession(user, id);
   if (!session) notFound();
   const [strokes, eraseEvents, timeline, { lecture, words }, lectureGaps] = await Promise.all([
     db.getStrokes(id),
     db.getEraseEvents(id),
     getTimeline(id),
     getSessionLecture(session.lectureId),
-    getLectureGaps(session.lectureId, { sessionId: id }),
+    getLectureGaps(session.lectureId, { studentId: user.id, sessionId: id }),
   ]);
   // ?moment=<eventId> opens that moment (links from /progress and "Carried over").
   const moment = typeof searchParams.moment === "string" && searchParams.moment.length <= 300 ? searchParams.moment : null;

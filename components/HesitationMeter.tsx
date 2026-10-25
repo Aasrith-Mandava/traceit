@@ -12,27 +12,29 @@ const LABEL: Record<MeterState, string> = {
   calibrating: "Learning your pace",
   steady: "Steady",
   slowing: "Slowing down",
-  stuck: "Hesitating",
+  stuck: "Thinking hard…",
 };
 
-// Literal class names so Tailwind generates them.
+// Literal class names so Tailwind generates them. The chip sits in the dark lecture band: quiet
+// while writing flows, warm orange once the student slows down or stalls.
 const BAR_ON: Record<MeterState, string> = {
-  calibrating: "bg-line-strong",
-  steady: "bg-accent",
-  slowing: "bg-amber-400",
-  stuck: "bg-gap",
+  calibrating: "bg-white/30",
+  steady: "bg-accent-light",
+  slowing: "bg-amber-300",
+  stuck: "bg-[#ffc266]",
 };
-const TEXT: Record<MeterState, string> = {
-  calibrating: "text-ink-subtle",
-  steady: "text-ink-subtle",
-  slowing: "text-gap-strong",
-  stuck: "text-gap-strong",
+const CHIP: Record<MeterState, string> = {
+  calibrating: "bg-white/5 text-night-text",
+  steady: "bg-white/5 text-night-text",
+  slowing: "bg-gap/10 text-amber-200",
+  stuck: "bg-gap/16 text-[#ffc266]",
 };
 
 /**
  * A small, calm read-out of how the last ~20 s of writing compares with the student's own normal
- * (lib/liveHesitation). Recomputed when the ink changes (a finished stroke, an erase) and every
- * 2 s — never per pointer move; only this small component re-renders, so drawing stays smooth.
+ * (lib/liveHesitation), shown as a chip in the lecture band. Recomputed when the ink changes (a
+ * finished stroke, an erase) and every 2 s — never per pointer move; only this small component
+ * re-renders, so drawing stays smooth.
  */
 export default function HesitationMeter({
   strokes,
@@ -64,9 +66,9 @@ export default function HesitationMeter({
       aria-valuemin={0}
       aria-valuemax={100}
       aria-valuenow={Math.round(level * 100)}
-      aria-valuetext={`${LABEL[state]}. ${detail}`}
+      aria-valuetext={`${LABEL[state]} — ${detail}`}
       title={detail}
-      className="inline-flex min-h-9 shrink-0 items-center gap-2 rounded-pill px-2.5 text-sm"
+      className={`inline-flex min-h-9 shrink-0 items-center gap-2 rounded-pill px-3 text-sm font-bold motion-safe:transition-colors motion-safe:duration-300 ${CHIP[state]}`}
     >
       <span aria-hidden="true" className="flex h-3.5 items-end gap-[3px]">
         {Array.from({ length: BARS }, (_, i) => (
@@ -74,12 +76,12 @@ export default function HesitationMeter({
             key={i}
             style={{ height: `${5 + i * 2}px` }}
             className={`w-[3px] rounded-pill motion-safe:transition-colors motion-safe:duration-300 ${
-              i < lit ? BAR_ON[state] : "bg-line"
+              i < lit ? BAR_ON[state] : "bg-white/15"
             }`}
           />
         ))}
       </span>
-      <span className={`hidden whitespace-nowrap font-medium md:inline ${TEXT[state]}`}>{LABEL[state]}</span>
+      <span className="hidden whitespace-nowrap md:inline">{LABEL[state]}</span>
     </div>
   );
 }

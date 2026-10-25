@@ -7,6 +7,7 @@ import "server-only";
 import type {
   BBox,
   CheckAttempt,
+  ClassInfo,
   ConfusionWindow,
   EraseEvent,
   HelpCard,
@@ -18,16 +19,22 @@ import type {
   ResolvedBy,
   Revision,
   RevisionReading,
+  Role,
   Session,
   Stroke,
+  TeacherClass,
   TimelineData,
   TimelineEvent,
   TranscriptSource,
   TranscriptWord,
+  User,
 } from "./types";
 import { activeStrokes, type InkCounts } from "./ink";
 
-/** The single local student (no accounts yet); sessions keep a studentId so this can grow. */
+/**
+ * The student every session belonged to before accounts existed (and the DEMO_MODE guest "Maya":
+ * lib/demoAccounts DEMO_STUDENT_ID). The first account created adopts their local sessions.
+ */
 export const LOCAL_STUDENT_ID = "demo-student";
 
 /** A session plus whether it has a stored analysis. */
@@ -93,7 +100,7 @@ export interface Db {
    * Per-session stroke counts for the session list, in one aggregate query: lines drawn and erased
    * parts, by exactly the rules of inkCounts in ./ink. Sessions without strokes are absent.
    */
-  sessionStrokeCounts(): Promise<Map<string, InkCounts>>;
+  sessionStrokeCounts(studentId?: string): Promise<Map<string, InkCounts>>;
   /** Insert or replace strokes by id (idempotent). */
   upsertStrokes(sessionId: string, strokes: Stroke[]): Promise<void>;
   /** Insert erase events by id; re-sending the same id is a no-op update. */
@@ -171,8 +178,61 @@ export interface Db {
    * computes it in SQL (TimescaleDB time_bucket on the ink_samples hypertable, else date_bin).
    */
   inkWindowStats(sessionId: string, windowMs: number): Promise<InkWindowStat[]>;
-  /** Class-wide ink per HOTSPOT_BUCKET_MS bucket of a lecture (Timescale: continuous aggregate). */
-  lectureInkHotspots(lectureId: string): Promise<InkHotspot[]>;
+  /**
+   * Ink per HOTSPOT_BUCKET_MS bucket of a lecture over the sessions of `studentIds` (undefined =
+   * everyone, [] = nobody). Timescale: the continuous aggregate when unfiltered; filtered queries
+   * bucket ink_samples joined with sessions (time_bucket / date_bin).
+   */
+  lectureInkHotspots(lectureId: string, studentIds?: string[]): Promise<InkHotspot[]>;
+
+  // ── Accounts ──
+  /** Null when the email (or id) is taken. Emails are stored lowercased. */
+  createUser(input: NewUser): Promise<User | null>;
+  getUser(id: string): Promise<User | null>;
+  /** Server only: the stored password hash (null for guest accounts). Case-insensitive email. */
+  getUserByEmail(email: string): Promise<{ user: User; passwordHash: string | null } | null>;
+  /** Null for an unknown user. */
+  setUserName(id: string, name: string): Promise<User | null>;
+  /** Accounts with a password (guests not counted). */
+  countAccounts(): Promise<number>;
+  /**
+   * Local data adoption (first sign-up): moves `fromStudentId`'s sessions (except `keepSessionIds`)
+   * to `toUserId`, and gives every owner-less non-demo lecture to `toUserId`. Never deletes.
+   */
+  adoptLegacyData(fromStudentId: string, toUserId: string, keepSessionIds: string[]): Promise<{ sessions: number; lectures: number }>;
+  /** Stores a sign-in session; only the sha256 of its token is ever stored. */
+  createAuthSession(input: { tokenHash: string; userId: string; expiresAtIso: string }): Promise<void>;
+  /** The user of an unexpired session, else null. */
+  getAuthSessionUser(tokenHash: string, nowIso: string): Promise<User | null>;
+  deleteAuthSession(tokenHash: string): Promise<void>;
+  /** Removes sessions expired at `nowIso`; returns how many. */
+  deleteExpiredAuthSessions(nowIso: string): Promise<number>;
+
+  // ── Classes ──
+  /** Null when the join code (or id) is taken: pick another code and retry. */
+  createClass(input: NewClass): Promise<ClassInfo | null>;
+  getClass(id: string): Promise<ClassInfo | null>;
+  /** Exact match (normalise the code first: lib/classes). */
+  getClassByJoinCode(code: string): Promise<ClassInfo | null>;
+  /** Newest first. */
+  listTeacherClasses(teacherId: string): Promise<TeacherClass[]>;
+  /** Classes a student is enrolled in, in joining order. */
+  listStudentClasses(studentId: string): Promise<StudentClass[]>;
+  /** Idempotent: true when the student was newly enrolled, false when already enrolled. */
+  enroll(classId: string, studentId: string): Promise<boolean>;
+  listClassStudentIds(classId: string): Promise<string[]>;
+
+  // ── Lecture visibility ──
+  /**
+   * Lectures a user may open: the bundled demo, their own, and those of classes they teach or are
+   * enrolled in (listLectures order: demo first, then newest first). listLectures stays unscoped.
+   */
+  listVisibleLectures(userId: string): Promise<Lecture[]>;
+  canViewLecture(userId: string, lectureId: string): Promise<boolean>;
+  /** False for an unknown lecture. */
+  setLectureClass(lectureId: string, classId: string | null): Promise<boolean>;
+  /** Sessions on a lecture by any of `studentIds`, oldest first ([] = none). */
+  listLectureSessions(lectureId: string, studentIds: string[]): Promise<Session[]>;
 
   /**
    * Runs `fn` atomically: every Db call made while it runs (through `fn`'s argument or getDb(),
@@ -190,6 +250,10 @@ export interface NewSession {
   title?: string;
   lectureId: string;
   courseId: string;
+  /**
+   * The signed-in user. Optional only until every caller passes it (Workstream B); defaults to
+   * LOCAL_STUDENT_ID.
+   */
   studentId?: string;
   /** Seeding only. */
   id?: string;
@@ -202,14 +266,16 @@ export interface NewSession {
  * literals work in SQLite ≥ 3.23 and Postgres; CAST keeps Postgres from returning bigint strings).
  * Must match isDrawnStroke / isErasedPart in ./ink. Both backends store an empty `replaced_by` as NULL.
  */
-export const SESSION_STROKE_COUNTS_SQL = `
+export const sessionStrokeCountsSql = (where = "") => `
   SELECT session_id,
          CAST(SUM(CASE WHEN split_from IS NULL AND is_scribble = FALSE
                         AND NOT (erased = TRUE AND COALESCE(erased_by, '') = 'undo') THEN 1 ELSE 0 END) AS INTEGER) AS drawn,
          CAST(SUM(CASE WHEN replaced_by IS NULL AND erased = TRUE AND is_scribble = FALSE
                         AND COALESCE(erased_by, '') <> 'undo' THEN 1 ELSE 0 END) AS INTEGER) AS erased_parts
   FROM strokes
+  ${where}
   GROUP BY session_id`;
+export const SESSION_STROKE_COUNTS_SQL = sessionStrokeCountsSql();
 
 export interface StrokeCountRow {
   session_id: string;
@@ -247,6 +313,10 @@ export interface NotabilityImportRecord {
 
 export interface NewLecture {
   id?: string;
+  /** The uploader (null / omitted: bundled or legacy, visible to nobody but via its class). */
+  ownerId?: string | null;
+  /** A class the uploader teaches (callers check it: lib/access taughtClass). */
+  classId?: string | null;
   title: string;
   courseId: string;
   /** Relative to the project root; server-generated, never from the client. */
@@ -270,6 +340,33 @@ export interface LectureRecord {
   lecture: Lecture;
   words: TranscriptWord[];
   mediaPath: string;
+  /** Who uploaded it; null for the bundled demo and lectures from before accounts. */
+  ownerId: string | null;
+  classId: string | null;
+}
+
+export interface NewUser {
+  /** Seeding only (demo accounts); the app lets the repository pick one. */
+  id?: string;
+  email: string;
+  name: string;
+  role: Role;
+  /** null: a guest account that can't sign in with a password. */
+  passwordHash: string | null;
+}
+
+export interface NewClass {
+  /** Seeding only. */
+  id?: string;
+  teacherId: string;
+  name: string;
+  joinCode: string;
+}
+
+export interface StudentClass {
+  id: string;
+  name: string;
+  teacherName: string;
 }
 
 /** What an analysis run stores; the baseline zones are derived from the windows' phases when read. */
@@ -366,6 +463,8 @@ export interface StrokeRow {
   is_scribble: number;
   split_from: string | null;
   replaced_by: string | null;
+  /** Pen size multiplier (NULL = Medium; lib/toolSizes). */
+  size: number | null;
 }
 export interface LectureRow {
   id: string;
@@ -378,6 +477,25 @@ export interface LectureRow {
   transcript_source: string;
   created_at: string;
   word_count: number;
+  owner_id: string | null;
+  class_id: string | null;
+  class_name: string | null;
+}
+export interface UserRow {
+  id: string;
+  email: string;
+  name: string;
+  role: string;
+  guest: number;
+  created_at: string;
+}
+export interface ClassRow {
+  id: string;
+  name: string;
+  teacher_id: string;
+  teacher_name: string;
+  join_code: string;
+  created_at: string;
 }
 export interface NotabilityRow {
   id: string;
@@ -434,6 +552,7 @@ export const toStroke = (r: StrokeRow): Stroke => ({
   isScribble: r.is_scribble === 1,
   splitFrom: r.split_from ?? null,
   replacedBy: r.replaced_by ? (JSON.parse(r.replaced_by) as string[]) : null,
+  ...(r.size != null ? { size: r.size } : {}),
 });
 
 export const toEraseEvent = (r: EraseRow): EraseEvent => ({
@@ -514,8 +633,33 @@ export const toLecture = (r: LectureRow): Lecture => {
   };
   // A Live lecture before its recording exists (the media path itself never leaves the server).
   if (r.transcript_source === 'live' && !r.media_path) lecture.live = true;
+  if (r.class_id) {
+    lecture.classId = r.class_id;
+    lecture.className = r.class_name ?? "";
+  }
   return lecture;
 };
+
+export const toUser = (r: UserRow): User => ({
+  id: r.id,
+  email: r.email,
+  name: r.name,
+  role: r.role as Role,
+  guest: Number(r.guest) === 1,
+  createdAtIso: r.created_at,
+});
+
+export const toClassInfo = (r: ClassRow): ClassInfo => ({
+  id: r.id,
+  name: r.name,
+  teacherId: r.teacher_id,
+  teacherName: r.teacher_name,
+  joinCode: r.join_code,
+  createdAtIso: r.created_at,
+});
+
+/** Emails are compared and stored lowercased. */
+export const normaliseEmail = (email: string) => email.trim().toLowerCase();
 
 export const toNotabilityImport = (r: NotabilityRow): NotabilityImport => ({
   id: r.id,

@@ -1,13 +1,19 @@
 import "server-only";
 
-// Periodic reset of the public demo (DEMO_MODE). Every visitor is the same local student, so anyone
-// can draw into Maya's seeded sessions and their own sessions show up for everyone (and feed Maya's
-// gaps-over-time). Every DEMO_RESET_MINUTES, in the server process (started from instrumentation.ts):
+// Periodic reset of the public demo (DEMO_MODE). Visitors are signed into shared guest accounts
+// ("Try the demo" → Maya, demo-student; "Try the teacher view" → demo-teacher), so anyone can draw
+// into Maya's seeded sessions, and every visitor's sessions show up for every other visitor. Every
+// DEMO_RESET_MINUTES, in the server process (started from instrumentation.ts):
 //
-//   1. visitor-uploaded lectures (PUBLIC_UPLOADS) older than DEMO_KEEP_VISITOR_MINUTES (default 60)
-//      are deleted with every session on them, and their media files,
-//   2. visitor sessions older than DEMO_KEEP_VISITOR_MINUTES are deleted, and
-//   3. the demo is rebuilt exactly as `npm run seed:demo -- --reset` does (lib/demoSeed).
+//   1. lectures uploaded by a guest (PUBLIC_UPLOADS), or with no owner (uploads from before
+//      accounts), older than DEMO_KEEP_VISITOR_MINUTES (default 60) are deleted with every session
+//      on them, and their media files — unless a real account has a session on one,
+//   2. guest sessions older than DEMO_KEEP_VISITOR_MINUTES are deleted (never the seeded demo's),
+//   3. expired sign-in sessions are deleted, and
+//   4. the demo is rebuilt exactly as `npm run seed:demo -- --reset` does (lib/demoSeed).
+//
+// Real accounts (with a password; e.g. the operator signing in on the demo) are never touched:
+// neither their sessions, nor their lectures, nor their sign-ins.
 //
 // Safety on SQLite (the Railway deploy): all steps run inside ONE transaction, so nothing is ever
 // half-reset. Requests arriving meanwhile wait at the repository's gate (lib/db gateSqlite) for the
@@ -19,6 +25,7 @@ import "server-only";
 // way); the deploy docs use SQLite.
 import { LOCAL_STUDENT_ID, getDb, type Db } from "./db";
 import { DEMO_LECTURE, DEMO_MEDIA_PATH } from "./demo";
+import { GUEST_IDS } from "./demoAccounts";
 import { isDemoMode } from "./demoMode";
 import { allDemoSessionIds, seedDemo, unlinkAll } from "./demoSeed";
 import { withLectureLock } from "./gaps";
@@ -54,12 +61,16 @@ export function keepVisitorMinutes(env: Env): number {
 }
 
 export interface DemoResetResult {
-  /** Visitor sessions deleted (not counting those removed with their lecture). */
+  /** Guest sessions deleted (not counting those removed with their lecture). */
   pruned: number;
-  /** Visitor-uploaded lectures deleted. */
+  /** Guest-uploaded (or owner-less) lectures deleted. */
   lectures: number;
+  /** Expired sign-in sessions deleted. */
+  signIns: number;
   ms: number;
 }
+
+const guests = new Set(GUEST_IDS);
 
 const isOld = (createdAtIso: string, olderThanMs: number, now: number) => {
   const created = Date.parse(createdAtIso);
@@ -67,19 +78,24 @@ const isOld = (createdAtIso: string, olderThanMs: number, now: number) => {
 };
 
 /**
- * Visitor-uploaded lectures (PUBLIC_UPLOADS) older than the cut-off, with every session on them;
- * their media files are queued for removal after COMMIT. Never the bundled demo lecture, nor any
- * lecture one of Maya's seeded sessions is on.
+ * Lectures a guest uploaded (PUBLIC_UPLOADS), or with no owner (uploaded before accounts), older
+ * than the cut-off, with every session on them; their media files are queued for removal after
+ * COMMIT. Never the bundled demo lecture, nor any lecture one of the seeded sessions is on, nor one
+ * a real account has a session on.
  */
 async function pruneVisitorLectures(db: Db, olderThanMs: number, now: number, files: string[]): Promise<number> {
   const demoSessions = new Set(allDemoSessionIds());
   const sessions = await db.listSessions();
   const protectedLectures = new Set([DEMO_LECTURE.lectureId]);
-  for (const s of sessions) if (demoSessions.has(s.id)) protectedLectures.add(s.lectureId);
+  for (const s of sessions) {
+    if (demoSessions.has(s.id) || !guests.has(s.studentId)) protectedLectures.add(s.lectureId);
+  }
   let pruned = 0;
   for (const lecture of await db.listLectures()) {
     if (protectedLectures.has(lecture.id) || lecture.transcriptSource === "demo") continue;
     if (!isOld(lecture.createdAtIso, olderThanMs, now)) continue;
+    const owner = (await db.getLecture(lecture.id))?.ownerId ?? null;
+    if (owner !== null && !guests.has(owner)) continue;
     for (const s of sessions) {
       if (s.lectureId !== lecture.id) continue;
       const { notabilityFiles } = await db.deleteSession(s.id);
@@ -101,7 +117,7 @@ async function pruneVisitors(db: Db, olderThanMs: number, now: number, files: st
   const demo = new Set(allDemoSessionIds());
   let pruned = 0;
   for (const s of await db.listSessions()) {
-    if (demo.has(s.id)) continue;
+    if (demo.has(s.id) || !guests.has(s.studentId)) continue;
     const created = Date.parse(s.createdAtIso);
     if (Number.isFinite(created) && now - created < olderThanMs) continue;
     const { deleted, notabilityFiles } = await db.deleteSession(s.id);
@@ -124,23 +140,24 @@ export async function resetDemo(env: Env = process.env, now: Date = new Date()):
     const keepMs = keepVisitorMinutes(env) * MINUTE;
     const lectures = await pruneVisitorLectures(db, keepMs, now.getTime(), files);
     const pruned = await pruneVisitors(db, keepMs, now.getTime(), files);
+    const signIns = await db.deleteExpiredAuthSessions(now.toISOString());
     await seedDemo({ reset: true, now, removedFiles: (removed) => files.push(...removed) });
-    return { pruned, lectures };
+    return { pruned, lectures, signIns };
   };
   const sqlite = (await db.info()).backend === "sqlite";
-  const { pruned, lectures } = sqlite
+  const { pruned, lectures, signIns } = sqlite
     ? await withLectureLock(LOCAL_STUDENT_ID, DEMO_LECTURE.lectureId, () => db.transaction(() => run()))
     : await run();
   await unlinkAll(files);
-  return { pruned, lectures, ms: Date.now() - started };
+  return { pruned, lectures, signIns, ms: Date.now() - started };
 }
 
-const g = globalThis as unknown as { __inklingDemoReset?: ReturnType<typeof setInterval> };
+const g = globalThis as unknown as { __traceitDemoReset?: ReturnType<typeof setInterval> };
 
 /** Starts the periodic reset once per process (no-op when off). Returns the interval in minutes. */
 export function startDemoResetTimer(env: Env = process.env): number | null {
   const minutes = demoResetMinutes(env);
-  if (minutes === null || g.__inklingDemoReset) return minutes;
+  if (minutes === null || g.__traceitDemoReset) return minutes;
   let running = false;
   const tick = async () => {
     if (running) return;
@@ -148,17 +165,17 @@ export function startDemoResetTimer(env: Env = process.env): number | null {
     try {
       const { pruned, lectures, ms } = await resetDemo(env);
       console.log(
-        `[inkling] demo reset in ${ms} ms (${pruned} visitor session${pruned === 1 ? "" : "s"}, ` +
+        `[traceit] demo reset in ${ms} ms (${pruned} visitor session${pruned === 1 ? "" : "s"}, ` +
           `${lectures} uploaded lecture${lectures === 1 ? "" : "s"} removed)`,
       );
     } catch (err) {
-      console.error(`[inkling] demo reset failed: ${err instanceof Error ? err.message : String(err)}`);
+      console.error(`[traceit] demo reset failed: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
       running = false;
     }
   };
-  g.__inklingDemoReset = setInterval(() => void tick(), Math.round(minutes * MINUTE));
-  g.__inklingDemoReset.unref?.();
-  console.log(`[inkling] DEMO_MODE: the demo resets every ${minutes} min`);
+  g.__traceitDemoReset = setInterval(() => void tick(), Math.round(minutes * MINUTE));
+  g.__traceitDemoReset.unref?.();
+  console.log(`[traceit] DEMO_MODE: the demo resets every ${minutes} min`);
   return minutes;
 }

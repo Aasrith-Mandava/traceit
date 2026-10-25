@@ -16,7 +16,7 @@ import type { ConfusionWindow, EraseEvent, HelpCard, Revision, Stroke, TimelineE
 
 // The storage contract, run against every backend with identical expectations: SQLite (the
 // default, a throwaway file) and Postgres (embedded PGlite: the non-Timescale Postgres path).
-const dir = mkdtempSync(join(tmpdir(), 'inkling-contract-'));
+const dir = mkdtempSync(join(tmpdir(), 'traceit-contract-'));
 let fileNo = 0;
 
 const backends: Array<[name: string, open: () => Db, backend: 'sqlite' | 'postgres']> = [
@@ -251,6 +251,23 @@ describe.each(backends)('Db contract: %s', (_name, open, backend) => {
       // Within one batch too.
       await db.upsertStrokes(s.id, [{ ...parent, id: 'k_p2', replacedBy: ['x'] }, { ...parent, id: 'k_p2' }]);
       expect((await db.getStrokes(s.id)).find((k) => k.id === 'k_p2')!.replacedBy).toEqual(['x']);
+    });
+
+    it('round-trips the pen size per stroke (absent = Medium) and keeps it when a copy without one is re-sent', async () => {
+      const s = await newSession();
+      const fine = stroke(s.id, 'k_fine', 100, { size: 0.6 });
+      const bold = stroke(s.id, 'k_bold', 200, { size: 2 });
+      const medium = stroke(s.id, 'k_medium', 300);
+      await db.upsertStrokes(s.id, [fine, bold, medium]);
+      const stored = await db.getStrokes(s.id);
+      expect(stored).toEqual([fine, bold, medium]);
+      expect(stored.map((k) => k.size)).toEqual([0.6, 2, undefined]);
+      expect('size' in stored[2]).toBe(false);
+      // Erasing re-sends the stroke; a copy without a size never resets it.
+      const noSize: Stroke = { ...bold };
+      delete noSize.size;
+      await db.upsertStrokes(s.id, [{ ...noSize, erased: true, erasedAtMs: 900, erasedBy: 'eraser' }]);
+      expect((await db.getStrokes(s.id)).find((k) => k.id === 'k_bold')).toMatchObject({ size: 2, erased: true });
     });
 
     it('never moves a stroke id that belongs to another session', async () => {
@@ -542,7 +559,7 @@ describe.each(backends)('Db contract: %s', (_name, open, backend) => {
       expect(l).toMatchObject({ id: 'l_contract', wordCount: 0, transcriptSource: 'none', mediaType: 'video' });
       const updated = await db.setLectureTranscript('l_contract', words, 'whisper');
       expect(updated).toMatchObject({ wordCount: 2, transcriptSource: 'whisper', createdAtIso: l.createdAtIso });
-      expect(await db.getLecture('l_contract')).toEqual({ lecture: updated, words, mediaPath: 'data/uploads/v.mp4' });
+      expect(await db.getLecture('l_contract')).toEqual({ lecture: updated, words, mediaPath: 'data/uploads/v.mp4', ownerId: null, classId: null });
       expect(await db.setLectureTranscript('l_nope', words, 'whisper')).toBeNull();
       expect(await db.getLecture('l_nope')).toBeNull();
     });
@@ -567,7 +584,7 @@ describe.each(backends)('Db contract: %s', (_name, open, backend) => {
       const done = await db.setLectureMedia('l_live', { mediaPath: 'data/uploads/r.m4a', mediaType: 'audio', mime: 'audio/mp4', durationMs: 2000 });
       expect(done).toMatchObject({ mime: 'audio/mp4', durationMs: 2000, transcriptSource: 'live', wordCount: 1 });
       expect(done!.live).toBeUndefined();
-      expect(await db.getLecture('l_live')).toEqual({ lecture: done, words, mediaPath: 'data/uploads/r.m4a' });
+      expect(await db.getLecture('l_live')).toEqual({ lecture: done, words, mediaPath: 'data/uploads/r.m4a', ownerId: null, classId: null });
       expect(await db.setLectureMedia('l_nope', { durationMs: 5 })).toBeNull();
     });
   });
@@ -654,6 +671,162 @@ describe.each(backends)('Db contract: %s', (_name, open, backend) => {
         [30_000, 2, 1],
       ]);
       expect(await db.lectureInkHotspots('l_empty')).toEqual([]);
+    });
+  });
+
+  describe('accounts and classes', () => {
+    const lec = (title: string) => ({
+      title,
+      courseId: 'c',
+      mediaPath: 'data/uploads/a.mp3',
+      mediaType: 'audio' as const,
+      mime: 'audio/mpeg',
+      durationMs: 1000,
+      words: [],
+      transcriptSource: 'none' as const,
+    });
+    const user = async (email: string, role: 'student' | 'teacher' = 'student', name = email.split('@')[0]) =>
+      (await db.createUser({ email, name, role, passwordHash: 'scrypt$test' }))!;
+
+    it('creates users (emails lowercased and unique), reads them by id and email, renames them', async () => {
+      const before = await db.countAccounts();
+      const u = await db.createUser({ email: '  Ada@Example.COM ', name: 'Ada', role: 'teacher', passwordHash: 'scrypt$x' });
+      expect(u).toMatchObject({ email: 'ada@example.com', name: 'Ada', role: 'teacher', guest: false });
+      expect(u!.id).toMatch(/^u_/);
+      expect(Number.isNaN(Date.parse(u!.createdAtIso))).toBe(false);
+      expect(await db.getUser(u!.id)).toEqual(u);
+      expect(await db.getUser('u_missing')).toBeNull();
+      expect(await db.getUserByEmail('ADA@example.com ')).toEqual({ user: u, passwordHash: 'scrypt$x' });
+      expect(await db.getUserByEmail('nobody@example.com')).toBeNull();
+      expect(await db.createUser({ email: 'ada@example.com', name: 'Other', role: 'student', passwordHash: null })).toBeNull();
+      const guest = await db.createUser({ id: 'guest-1', email: 'g@demo.invalid', name: 'G', role: 'student', passwordHash: null });
+      expect(guest).toMatchObject({ id: 'guest-1', guest: true, role: 'student' });
+      expect(await db.createUser({ id: 'guest-1', email: 'g2@demo.invalid', name: 'G', role: 'student', passwordHash: null })).toBeNull();
+      expect(await db.countAccounts()).toBe(before + 1); // guests have no password: not accounts
+      expect(await db.setUserName(u!.id, 'Ada L.')).toMatchObject({ id: u!.id, name: 'Ada L.' });
+      expect(await db.setUserName('u_missing', 'x')).toBeNull();
+    });
+
+    it('stores sign-in sessions by token hash and expires them', async () => {
+      const u = await user('sess@example.com');
+      const now = '2026-10-25T12:00:00.000Z';
+      await db.createAuthSession({ tokenHash: 'th-live', userId: u.id, expiresAtIso: '2026-10-26T12:00:00.000Z' });
+      await db.createAuthSession({ tokenHash: 'th-old', userId: u.id, expiresAtIso: '2026-10-25T11:59:59.000Z' });
+      expect(await db.getAuthSessionUser('th-live', now)).toEqual(u);
+      expect(await db.getAuthSessionUser('th-old', now)).toBeNull();
+      expect(await db.getAuthSessionUser('th-nope', now)).toBeNull();
+      expect(await db.deleteExpiredAuthSessions(now)).toBeGreaterThanOrEqual(1);
+      expect(await db.getAuthSessionUser('th-live', now)).toEqual(u);
+      await db.deleteAuthSession('th-live');
+      expect(await db.getAuthSessionUser('th-live', now)).toBeNull();
+    });
+
+    it('creates classes with unique join codes, enrolls idempotently and lists both sides', async () => {
+      const t = await user('teach@class.test', 'teacher', 'Ms T');
+      const s1 = await user('s1@class.test');
+      const s2 = await user('s2@class.test');
+      const c = (await db.createClass({ teacherId: t.id, name: 'Calc', joinCode: 'CODE0001' }))!;
+      expect(c).toMatchObject({ name: 'Calc', teacherId: t.id, teacherName: 'Ms T', joinCode: 'CODE0001' });
+      expect(c.id).toMatch(/^c_/);
+      expect(await db.createClass({ teacherId: t.id, name: 'Dup', joinCode: 'CODE0001' })).toBeNull();
+      expect(await db.getClass(c.id)).toEqual(c);
+      expect(await db.getClass('c_missing')).toBeNull();
+      expect(await db.getClassByJoinCode('CODE0001')).toEqual(c);
+      expect(await db.getClassByJoinCode('NOPE0000')).toBeNull();
+
+      expect(await db.enroll(c.id, s1.id)).toBe(true);
+      expect(await db.enroll(c.id, s1.id)).toBe(false);
+      expect(await db.enroll(c.id, s2.id)).toBe(true);
+      expect((await db.listClassStudentIds(c.id)).sort()).toEqual([s1.id, s2.id].sort());
+
+      const c2 = (await db.createClass({ teacherId: t.id, name: 'Calc 2', joinCode: 'CODE0002' }))!;
+      await db.createLecture({ ...lec('In Calc'), ownerId: t.id, classId: c.id });
+      const listed = (await db.listTeacherClasses(t.id)).sort((a, b) => a.name.localeCompare(b.name));
+      expect(listed).toEqual([
+        { ...c, studentCount: 2, lectureCount: 1 },
+        { ...c2, studentCount: 0, lectureCount: 0 },
+      ]);
+      expect(await db.listTeacherClasses(s1.id)).toEqual([]);
+      expect(await db.listStudentClasses(s1.id)).toEqual([{ id: c.id, name: 'Calc', teacherName: 'Ms T' }]);
+      expect(await db.listStudentClasses(t.id)).toEqual([]);
+    });
+
+    it('shows a user the demo lecture, their own and their classes’ lectures only', async () => {
+      const t = await user('vis-t@class.test', 'teacher');
+      const s = await user('vis-s@class.test');
+      const o = await user('vis-o@class.test');
+      const c = (await db.createClass({ teacherId: t.id, name: 'Vis', joinCode: 'CODE0003' }))!;
+      await db.enroll(c.id, s.id);
+      const own = await db.createLecture({ ...lec('Own'), ownerId: o.id });
+      const inClass = await db.createLecture({ ...lec('Class'), ownerId: t.id, classId: c.id });
+      const legacy = await db.createLecture(lec('Legacy'));
+      expect(own.classId).toBeUndefined();
+      expect(inClass).toMatchObject({ classId: c.id, className: 'Vis' });
+      expect(await db.getLecture(inClass.id)).toMatchObject({ lecture: inClass, ownerId: t.id, classId: c.id });
+      expect(await db.getLecture(legacy.id)).toMatchObject({ ownerId: null, classId: null });
+
+      const ids = async (userId: string) => (await db.listVisibleLectures(userId)).map((l) => l.id);
+      expect(await ids(s.id)).toEqual([DEMO, inClass.id]);
+      expect(await ids(t.id)).toEqual([DEMO, inClass.id]);
+      expect(await ids(o.id)).toEqual([DEMO, own.id]);
+      expect((await db.listVisibleLectures(s.id))[1]).toEqual(inClass);
+      expect(await db.canViewLecture(s.id, inClass.id)).toBe(true);
+      expect(await db.canViewLecture(o.id, inClass.id)).toBe(false);
+      expect(await db.canViewLecture(s.id, own.id)).toBe(false);
+      expect(await db.canViewLecture(o.id, legacy.id)).toBe(false);
+      expect(await db.canViewLecture(o.id, DEMO)).toBe(true);
+      expect(await db.canViewLecture(o.id, 'l_missing')).toBe(false);
+
+      // Out of the class: the student no longer sees it; the owner still does.
+      expect(await db.setLectureClass(inClass.id, null)).toBe(true);
+      expect(await db.canViewLecture(s.id, inClass.id)).toBe(false);
+      expect(await db.canViewLecture(t.id, inClass.id)).toBe(true);
+      expect((await db.getLecture(inClass.id))!.lecture.classId).toBeUndefined();
+      expect(await db.setLectureClass('l_missing', null)).toBe(false);
+    });
+
+    it('scopes lecture sessions, stroke counts and hotspots to given students', async () => {
+      const a = await newSession({ studentId: 'st-scope-a', lectureId: 'l_scope' });
+      const b = await newSession({ studentId: 'st-scope-b', lectureId: 'l_scope' });
+      const elsewhere = await newSession({ studentId: 'st-scope-a', lectureId: 'l_scope_other' });
+      await db.upsertStrokes(a.id, [stroke(a.id, 'sc-a1', 1000), stroke(a.id, 'sc-a2', 31_000)]);
+      await db.upsertStrokes(b.id, [stroke(b.id, 'sc-b1', 2000)]);
+      await db.upsertStrokes(elsewhere.id, [stroke(elsewhere.id, 'sc-e1', 2000)]);
+
+      expect((await db.listLectureSessions('l_scope', ['st-scope-a'])).map((s) => s.id)).toEqual([a.id]);
+      expect((await db.listLectureSessions('l_scope', ['st-scope-a', 'st-scope-b'])).map((s) => s.id)).toEqual([a.id, b.id]);
+      expect(await db.listLectureSessions('l_scope', [])).toEqual([]);
+
+      expectStatsClose(await db.lectureInkHotspots('l_scope', ['st-scope-a']), computeInkHotspots(await db.getStrokes(a.id)));
+      expect(await db.lectureInkHotspots('l_scope', [])).toEqual([]);
+      expect(await db.lectureInkHotspots('l_scope', ['nobody'])).toEqual([]);
+      expectStatsClose(
+        await db.lectureInkHotspots('l_scope'),
+        computeInkHotspots([...(await db.getStrokes(a.id)), ...(await db.getStrokes(b.id))]),
+      );
+
+      const counts = await db.sessionStrokeCounts('st-scope-a');
+      expect([...counts.keys()].sort()).toEqual([a.id, elsewhere.id].sort());
+      expect(counts.get(a.id)).toEqual({ drawn: 2, erasedParts: 0 });
+      expect((await db.sessionStrokeCounts()).has(b.id)).toBe(true);
+    });
+
+    it('adopts the local student’s sessions (except kept ones) and owner-less uploads, never the demo lecture', async () => {
+      const mine = await newSession({ studentId: 'st-legacy' });
+      const kept = await newSession({ studentId: 'st-legacy' });
+      const other = await newSession({ studentId: 'st-legacy-other' });
+      const upload = await db.createLecture(lec('Old upload'));
+      const owned = await db.createLecture({ ...lec('Owned'), ownerId: 'u-someone' });
+      const res = await db.adoptLegacyData('st-legacy', 'u-adopter', [kept.id]);
+      expect(res.sessions).toBe(1);
+      expect(res.lectures).toBeGreaterThanOrEqual(1);
+      expect((await db.getSession(mine.id))!.studentId).toBe('u-adopter');
+      expect((await db.getSession(kept.id))!.studentId).toBe('st-legacy');
+      expect((await db.getSession(other.id))!.studentId).toBe('st-legacy-other');
+      expect((await db.getLecture(upload.id))!.ownerId).toBe('u-adopter');
+      expect((await db.getLecture(owned.id))!.ownerId).toBe('u-someone');
+      expect((await db.getLecture(DEMO))!.ownerId).toBeNull();
+      expect(await db.adoptLegacyData('st-legacy', 'u-adopter', [kept.id])).toEqual({ sessions: 0, lectures: 0 });
     });
   });
 });

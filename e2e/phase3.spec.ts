@@ -54,7 +54,7 @@ const scribbleOverWord = (page: Page, box: Box) => drawZigzag(page, box, 190, 37
 
 type Pixels = { ink: number; ghost: number };
 
-/** Ink-dark and teal ghost-ink pixel counts in a CSS-px rectangle centred on (cx, cy) of a canvas. */
+/** Ink-dark (#1d1a3a) and light-indigo ghost-ink (#8b80f9 at 50 %) pixel counts in a CSS-px rectangle centred on (cx, cy) of a canvas. */
 async function pixelsAt(page: Page, cx: number, cy: number, halfW: number, halfH: number, testId = "ink-canvas") {
   return page.getByTestId(testId).evaluate(
     (el, [cx, cy, hw, hh]): Pixels => {
@@ -68,7 +68,7 @@ async function pixelsAt(page: Page, cx: number, cy: number, halfW: number, halfH
       for (let i = 0; i < data.length; i += 4) {
         const [r, g, b, a] = [data[i], data[i + 1], data[i + 2], data[i + 3]];
         if (a > 150 && r < 90 && g < 90 && b < 90) ink++;
-        if (a > 20 && r < 100 && g > 110 && b < g + 8 && g - r > 60) ghost++;
+        if (a > 20 && r > 90 && b > 200 && b - r > 70 && b - g > 80) ghost++;
       }
       return { ink, ghost };
     },
@@ -112,8 +112,8 @@ test("scribbling over a word erases it into ghost ink, with a toast, and it pers
   // The word and the zig-zag are both ghost ink now (nothing visible, nothing deleted).
   await expectCounts(page, 2, 0, 2);
   // Phase 8 (stroke counter): the student drew one word (the zig-zag is an erasing gesture, not a
-  // line they wrote), now erased — "1 stroke · 1 erased part" instead of "0 strokes · 2 ghost".
-  await expect(page.getByTestId("stroke-counter")).toHaveText("1 stroke · 1 erased part");
+  // line they wrote), now erased — "1 pen stroke · 1 ghost" instead of "0 strokes · 2 ghost".
+  await expect(page.getByTestId("stroke-counter")).toHaveText("1 pen stroke · 1 ghost");
   const toast = page.getByTestId("scribble-toast");
   await expect(toast).toBeVisible();
   await expect(toast).toContainText("Scribbled out — kept as ghost");
@@ -122,7 +122,7 @@ test("scribbling over a word erases it into ghost ink, with a toast, and it pers
   // Ghost off: once the fade finishes the area holds no ink at all.
   await expect.poll(() => wordPixels(page)).toEqual({ ink: 0, ghost: 0 });
 
-  // Ghost on: the word and the zig-zag show in teal ghost ink, still no black ink.
+  // Ghost on: the word and the zig-zag show in light-indigo ghost ink, still no dark ink.
   await page.getByTestId("ghost-toggle").check();
   await expect(page.getByTestId("ink-canvas")).toHaveAttribute("data-ghost", "on");
   const ghostOn = await wordPixels(page);
@@ -222,8 +222,9 @@ test("scribble-out then rewrite in the same spot shows a corrected misconception
   await expect(corrected).toHaveCount(1);
   await expect(page.getByTestId("count-corrected")).toHaveText("1");
 
-  await corrected.first().click();
-  await expect(page.getByTestId("moment-detail")).toBeVisible();
+  // The only moment opens by itself (clicking its pressed marker would close it).
+  await expect(page.getByTestId("moment-detail")).toHaveAttribute("data-type", "misconception_corrected");
+  await expect(corrected.first()).toHaveAttribute("aria-pressed", "true");
   await expect.poll(() => paintedPixels(page, "before-canvas")).toBeGreaterThan(40);
   await expect.poll(() => paintedPixels(page, "after-canvas")).toBeGreaterThan(40);
 

@@ -1,4 +1,6 @@
 import { open, unlink } from "node:fs/promises";
+import { ownedLecture } from "@/lib/access";
+import { withUser } from "@/lib/auth/core";
 import { getDb } from "@/lib/db";
 import { sameOriginOnly } from "@/lib/http";
 import { getLecture } from "@/lib/lecture";
@@ -20,7 +22,7 @@ const FORMATS: Record<string, { container: "webm" | "mp4"; ext: MediaExt; mime: 
  * so Replay 20 s works in review. Same storage, size limit and magic-byte check as uploads. Once a
  * recording is attached the lecture plays back like any uploaded one. 403 in DEMO_MODE.
  */
-export const POST = sameOriginOnly(async (request: Request, ctx: { params: Promise<{ id: string }> }) => {
+export const POST = sameOriginOnly(withUser(async (request, user, ctx: { params: Promise<{ id: string }> }) => {
   if (liveLectureDisabled(process.env)) return fail(403, LIVE_DEMO_MESSAGE);
   const { id } = await ctx.params;
 
@@ -34,7 +36,7 @@ export const POST = sameOriginOnly(async (request: Request, ctx: { params: Promi
     return fail(400, "durationMs must be the recording's length in ms.");
   }
 
-  const record = await getLecture(id);
+  const record = await ownedLecture(user, id);
   if (!record) return fail(404, "lecture not found");
   if (!record.lecture.live) return fail(409, "This lecture already has its recording.");
   if (!request.body) return fail(400, "The recording is empty.");
@@ -99,4 +101,4 @@ export const POST = sameOriginOnly(async (request: Request, ctx: { params: Promi
     console.error("live recording save failed", err instanceof Error ? err.message : err);
     return fail(500, "Could not save the recording.");
   }
-});
+}));

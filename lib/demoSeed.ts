@@ -6,7 +6,9 @@ import "server-only";
 // check-question grading — so what the demo shows is exactly what the app computes.
 //
 // Idempotent: when the demo is already complete it changes nothing; `reset` rebuilds it (only the
-// demo's own sessions are touched). Every seeded moment has DEMO_MODE fixtures
+// demo's own sessions are touched). It also makes sure the demo accounts exist (lib/demoAccounts:
+// Maya, the demo teacher and the classmates, as password-less guests; the demo class with everyone
+// enrolled; the bundled lecture in that class). Maya's sessions belong to demo-student. Every seeded moment has DEMO_MODE fixtures
 // (public/demo/ai-cache.json), so help cards and revision readings work offline.
 import { unlink, writeFile } from "node:fs/promises";
 import demoFixturesJson from "@/public/demo/ai-cache.json";
@@ -14,6 +16,7 @@ import { analyzeSession } from "./analyze";
 import { demoEntryFor, demoHelpCard, parseDemoFixtures } from "./ai/demo";
 import { LOCAL_STUDENT_ID, getDb, type Db } from "./db";
 import { DEMO_LECTURE } from "./demo";
+import { DEMO_CLASS_ID, DEMO_SESSION_IDS, DEMO_TEACHER_ID, DEMO_USERS, ensureDemoUsers } from "./demoAccounts";
 import { renderFinalPagePdf } from "./demoPdf";
 import {
   DEMO_CLASSMATES,
@@ -41,14 +44,21 @@ export interface SeedSummary {
 const HOUR = 3_600_000;
 
 /** Every session the demo owns (Maya's two and the classmates'); anything else is a visitor's. */
-export const allDemoSessionIds = () => [
-  DEMO_SESSIONS.s1.id,
-  DEMO_SESSIONS.s2.id,
-  ...Array.from({ length: DEMO_CLASSMATES }, (_, i) => classmateSessionId(i)),
-];
+export const allDemoSessionIds = () => [...DEMO_SESSION_IDS];
+
+/** The demo accounts, the demo class (taught by the demo teacher, everyone enrolled) and its lecture. */
+async function accountsComplete(db: Db): Promise<boolean> {
+  for (const u of DEMO_USERS) if (!(await db.getUser(u.id))) return false;
+  const cls = await db.getClass(DEMO_CLASS_ID);
+  if (!cls || cls.teacherId !== DEMO_TEACHER_ID) return false;
+  const enrolled = new Set(await db.listClassStudentIds(DEMO_CLASS_ID));
+  if (DEMO_USERS.some((u) => u.role === "student" && !enrolled.has(u.id))) return false;
+  return (await db.getLecture(DEMO_LECTURE.lectureId))?.classId === DEMO_CLASS_ID;
+}
 
 /** True when every part of the demo is stored (a crash mid-seed leaves it incomplete → rebuilt). */
 async function isComplete(db: Db): Promise<boolean> {
+  if (!(await accountsComplete(db))) return false;
   for (const id of allDemoSessionIds()) if (!(await db.getSession(id))) return false;
   const s1 = await db.getAnalysis(DEMO_SESSIONS.s1.id);
   const s2 = await db.getAnalysis(DEMO_SESSIONS.s2.id);
@@ -99,6 +109,8 @@ export async function seedDemo(
   const db = getDb();
   if (!(await db.getLecture(DEMO_LECTURE.lectureId))) throw new Error("the bundled demo lecture is missing");
   if (!opts.reset && (await isComplete(db))) return { status: "already-seeded", sessions: await summary(db) };
+  // The guest accounts "Try the demo" signs into, and the demo class (idempotent; real accounts untouched).
+  await ensureDemoUsers(db);
   const obsolete = await removeDemo(db);
 
   const now = (opts.now ?? new Date()).getTime();

@@ -111,20 +111,20 @@ describe("wrapText", () => {
 });
 
 describe("exportFileName", () => {
-  it("is inkling-<safe-title>.pdf", () => {
-    expect(exportFileName("Maya — Session 1")).toBe("inkling-maya-session-1.pdf");
-    expect(exportFileName("../../etc/passwd")).toBe("inkling-etc-passwd.pdf");
-    expect(exportFileName('a"b;c\r\nd')).toBe("inkling-a-b-c-d.pdf");
-    expect(exportFileName("")).toBe("inkling-notes.pdf");
-    expect(exportFileName("✨✨")).toBe("inkling-notes.pdf");
-    expect(exportFileName("x".repeat(300)).length).toBeLessThanOrEqual("inkling-.pdf".length + 60);
+  it("is traceit-<safe-title>.pdf", () => {
+    expect(exportFileName("Maya — Session 1")).toBe("traceit-maya-session-1.pdf");
+    expect(exportFileName("../../etc/passwd")).toBe("traceit-etc-passwd.pdf");
+    expect(exportFileName('a"b;c\r\nd')).toBe("traceit-a-b-c-d.pdf");
+    expect(exportFileName("")).toBe("traceit-notes.pdf");
+    expect(exportFileName("✨✨")).toBe("traceit-notes.pdf");
+    expect(exportFileName("x".repeat(300)).length).toBeLessThanOrEqual("traceit-.pdf".length + 60);
   });
 });
 
 describe("momentBlocks", () => {
   it("lists moments in lecture order with type, before→after reading, excerpt and re-explanation", () => {
     const blocks = momentBlocks(events, revisions);
-    expect(blocks.map((b) => b.heading)).toEqual(["01:02 · Breakthrough", "01:40 · Corrected", "04:10 · Gap"]);
+    expect(blocks.map((b) => b.heading)).toEqual(["01:02 · Aha moment", "01:40 · Fixed", "04:10 · Still fuzzy"]);
     expect(blocks.map((b) => b.type)).toEqual(["breakthrough", "misconception_corrected", "unresolved_gap"]);
     const corrected = Object.fromEntries(blocks[1].lines.map((l) => [l.label, l.text]));
     expect(corrected).toMatchObject({
@@ -133,9 +133,9 @@ describe("momentBlocks", () => {
       Concept: "Chain rule",
     });
     const gap = Object.fromEntries(blocks[2].lines.map((l) => [l.label, l.text]));
-    expect(gap["Re-explanation"]).toContain("product rule");
+    expect(gap["Explanation"]).toContain("product rule");
     expect(gap.Reading).toBeUndefined();
-    expect(MOMENT_PDF_LABEL).toEqual({ misconception_corrected: "Corrected", unresolved_gap: "Gap", breakthrough: "Breakthrough" });
+    expect(MOMENT_PDF_LABEL).toEqual({ misconception_corrected: "Fixed", unresolved_gap: "Still fuzzy", breakthrough: "Aha moment" });
   });
 });
 

@@ -92,11 +92,11 @@ export function inkCounts(strokes: CountableStroke[]): InkCounts {
   return { drawn, erasedParts };
 }
 
-/** "1 stroke · 1 erased part" (the erased part is left out when there is none). */
+/** "1 pen stroke · 1 ghost" (the ghost count is left out when there is none). */
 export function inkCountsLabel({ drawn, erasedParts }: InkCounts): { strokes: string; erased: string | null } {
   return {
-    strokes: `${drawn} ${drawn === 1 ? "stroke" : "strokes"}`,
-    erased: erasedParts > 0 ? `${erasedParts} erased ${erasedParts === 1 ? "part" : "parts"}` : null,
+    strokes: `${drawn} ${drawn === 1 ? "pen stroke" : "pen strokes"}`,
+    erased: erasedParts > 0 ? `${erasedParts} ${erasedParts === 1 ? "ghost" : "ghosts"}` : null,
   };
 }
 
@@ -144,6 +144,8 @@ function makePiece(parent: Stroke, points: Point[], erased: boolean, atMs: numbe
     isScribble: parent.isScribble,
     splitFrom: parent.id,
     replacedBy: null,
+    // Pieces keep the pen size they were drawn with.
+    ...(parent.size != null ? { size: parent.size } : {}),
   };
 }
 
@@ -229,8 +231,17 @@ export function splitStrokeByEraser(
   return { parent: { ...stroke, replacedBy: pieces.map((p) => p.id) }, pieces };
 }
 
-/** A fresh live pen stroke from captured points (timing, bbox and metrics derived from them). */
-export function buildStroke(id: string, sessionId: string, points: Point[], pointerType: Stroke["pointerType"]): Stroke {
+/**
+ * A fresh live pen stroke from captured points (timing, bbox and metrics derived from them).
+ * `size` is the pen size multiplier (lib/toolSizes); Medium (1) is stored as absent, as before.
+ */
+export function buildStroke(
+  id: string,
+  sessionId: string,
+  points: Point[],
+  pointerType: Stroke["pointerType"],
+  size = 1,
+): Stroke {
   return {
     id,
     sessionId,
@@ -245,6 +256,7 @@ export function buildStroke(id: string, sessionId: string, points: Point[], poin
     erasedAtMs: null,
     erasedBy: null,
     isScribble: false,
+    ...(size !== 1 ? { size } : {}),
   };
 }
 

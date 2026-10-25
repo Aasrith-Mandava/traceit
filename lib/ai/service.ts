@@ -3,7 +3,7 @@ import "server-only";
 // Phase 5 AI features, server side. Everything is lazy (generated the first time a moment is
 // opened) and cached twice: per input in ai_cache (sha256 of provider|model|kind|input, so the same
 // moment in another session or after re-analysis costs nothing) and per moment on the event /
-// revision row. Fresh generations are rate-limited per session, at most 2 run at once, and
+// revision row. Fresh generations are rate-limited per account (per session for demo guests), at most 2 run at once, and
 // concurrent requests for the same result share one call. DEMO_MODE serves bundled fixtures and
 // never touches the network.
 //
@@ -18,6 +18,7 @@ import demoFixturesJson from "@/public/demo/ai-cache.json";
 import { getTimeline } from "../analyze";
 import { createConceptTagger } from "../concepts";
 import { getDb } from "../db";
+import { GUEST_IDS } from "../demoAccounts";
 import { publicHelp, toClientEvent } from "../events";
 import { attachHistory, withLectureLock } from "../gaps";
 import { getSessionLecture } from "../lecture";
@@ -56,7 +57,7 @@ export interface AiServiceDeps {
   /** Overrides the selected provider (tests). The mode still comes from `env`. */
   provider?: AiProvider;
   limits?: AiLimits;
-  /** Where synthesised speech is cached (default data/tts, or INKLING_TTS_DIR). */
+  /** Where synthesised speech is cached (default data/tts, or TRACEIT_TTS_DIR). */
   ttsDir?: string;
 }
 
@@ -94,16 +95,16 @@ const intEnv = (v: string | undefined, fallback: number, min: number, max: numbe
 };
 
 // Shared across requests (and Next dev hot reloads).
-const g = globalThis as unknown as { __inklingAiLimits?: AiLimits; __inklingDemoFixtures?: DemoFixtures };
+const g = globalThis as unknown as { __traceitAiLimits?: AiLimits; __traceitDemoFixtures?: DemoFixtures };
 function sharedLimits(env: Env): AiLimits {
-  return (g.__inklingAiLimits ??= {
+  return (g.__traceitAiLimits ??= {
     // Fresh generations per session per 10 minutes (cached results are free).
     rate: createRateLimiter({ limit: intEnv(env.AI_RATE_LIMIT, 30, 1, 10_000), windowMs: 10 * 60_000 }),
     semaphore: createSemaphore(intEnv(env.AI_MAX_CONCURRENCY, 2, 1, 16)),
     flight: createSingleFlight(),
   });
 }
-const demoFixtures = () => (g.__inklingDemoFixtures ??= parseDemoFixtures(demoFixturesJson));
+const demoFixtures = () => (g.__traceitDemoFixtures ??= parseDemoFixtures(demoFixturesJson));
 
 /** Words spoken in [startMs, endMs]. */
 const textBetween = (words: TranscriptWord[], startMs: number, endMs: number) =>
@@ -137,14 +138,19 @@ export function createAiService(deps: AiServiceDeps = {}) {
     return toClientEvent(withHistory);
   }
 
+  /**
+   * Fresh generations are budgeted per account (a new session doesn't reset it). The shared demo
+   * guests are used by many visitors at once, so theirs stay per session.
+   */
   function rateLimited(session: Session): Fail | null {
     const { rate } = limits();
-    if (rate.take(session.id)) return null;
+    const key = GUEST_IDS.includes(session.studentId) ? `session:${session.id}` : `user:${session.studentId}`;
+    if (rate.take(key)) return null;
     return {
       ok: false,
       status: 429,
       error: "Too many AI requests for this session — try again in a few minutes.",
-      retryAfterMs: rate.retryAfterMs(session.id),
+      retryAfterMs: rate.retryAfterMs(key),
     };
   }
 
@@ -508,12 +514,12 @@ export function createAiService(deps: AiServiceDeps = {}) {
 export type AiService = ReturnType<typeof createAiService>;
 
 /**
- * Test-only switch: a request carrying `x-inkling-ai: off` is served as if no AI provider were
+ * Test-only switch: a request carrying `x-traceit-ai: off` is served as if no AI provider were
  * configured. It can only turn AI off (never on or to another provider), and it is ignored in
  * production builds. The e2e suite uses it to run the pre-Phase-5 specs and the "needs an API key"
  * check against the same dev server that serves the fake provider to e2e/phase5.spec.ts.
  */
-export const AI_OFF_HEADER = "x-inkling-ai";
+export const AI_OFF_HEADER = "x-traceit-ai";
 
 export function aiDisabledByRequest(headers: Headers | null | undefined): boolean {
   return process.env.NODE_ENV !== "production" && headers?.get(AI_OFF_HEADER)?.trim().toLowerCase() === "off";
@@ -522,7 +528,7 @@ export function aiDisabledByRequest(headers: Headers | null | undefined): boolea
 /** The app's service: process.env (read per call), shared limits, real fetch. */
 export function aiService(headers?: Headers | null): AiService {
   if (aiDisabledByRequest(headers)) {
-    return createAiService({ env: { ...process.env, AI_PROVIDER: "", DEMO_MODE: "", INKLING_DISABLE_AI: "1" } });
+    return createAiService({ env: { ...process.env, AI_PROVIDER: "", DEMO_MODE: "", TRACEIT_DISABLE_AI: "1" } });
   }
   return createAiService();
 }

@@ -1,49 +1,43 @@
 // Shared chrome primitives: button styles, the top toolbar shell, page headers, back link and the
-// ghost-ink switch. The look follows the landing page (/welcome): pill buttons, a pearl-teal metal
-// primary (CSS gradient, never WebGL), white panels with hairline borders and soft shadows.
-import Link from "next/link";
+// ghost-ink switch. The "Highlighter" look shared with the landing page (/welcome): solid ink-indigo
+// primary buttons, outlined secondaries, white cards with hairline borders and soft indigo shadows.
 import type { ReactNode } from "react";
 import { Highlight } from "./motion/Highlight";
 import { Reveal } from "./motion/Reveal";
-import { ChevronLeftIcon, GhostInkIcon } from "./icons";
+import { GhostInkIcon } from "./icons";
 
 const btnBase =
-  "press inline-flex min-h-11 items-center justify-center gap-2 rounded-pill px-4 text-sm font-semibold whitespace-nowrap select-none disabled:cursor-not-allowed disabled:opacity-60";
+  "press inline-flex min-h-11 items-center justify-center gap-2 rounded-md px-4 text-[15px] font-bold whitespace-nowrap select-none disabled:cursor-not-allowed disabled:opacity-60";
 
-/** Primary action: the pearl-teal metal pill. */
+/** Primary action: solid ink indigo with a soft glow. */
 export const btnPrimary = `${btnBase} btn-metal px-5`;
-/** Secondary action: white pill, hairline border, teal on hover. */
+/** Secondary action: white, outlined, indigo on hover. */
 export const btnSecondary = `${btnBase} btn-quiet`;
-/** Quiet inline action (links such as "Teacher view", "Retry"): teal text, soft teal hover. */
+/** Quiet inline action (links such as "Class insights", "Retry"): indigo text, soft indigo hover. */
 export const btnLink =
-  "press inline-flex min-h-11 items-center gap-1 rounded-pill px-3 text-sm font-semibold text-accent hover:bg-accent-soft hover:text-accent-press";
+  "press inline-flex min-h-11 items-center gap-1 rounded-md px-3 text-sm font-bold text-accent hover:bg-accent-soft hover:text-accent-press";
 export const iconBtn =
-  "press inline-flex size-11 shrink-0 items-center justify-center rounded-pill text-ink-muted hover:bg-chrome-hover hover:text-ink active:bg-chrome-press";
+  "press inline-flex size-11 shrink-0 items-center justify-center rounded-[12px] bg-desk text-ink hover:bg-accent-soft hover:text-accent-strong active:bg-chrome-press";
 
 /** White panel with a hairline border and a soft shadow (lists, forms, cards). */
 export const panel = "panel";
 /** The same panel as a divided list. */
 export const panelList = "panel divide-y divide-line overflow-hidden";
 
-/** Slim app toolbar: white, hairline bottom border. Wraps onto a second row on narrow screens. */
+/** App toolbar: white, hairline bottom border. Wraps onto a second row on narrow screens. */
 export function TopBar({ children, label }: { children: ReactNode; label: string }) {
   return (
     <header
       aria-label={label}
-      className="relative z-10 flex min-h-[var(--toolbar-h)] shrink-0 flex-wrap items-center gap-x-3 gap-y-1 border-b border-line bg-chrome/95 px-2 py-2 shadow-[0_1px_2px_rgb(15_23_42/0.03)] sm:px-3"
+      className="relative z-10 flex min-h-[var(--toolbar-h)] shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-b border-line bg-chrome px-3 py-3 sm:px-6"
     >
       {children}
     </header>
   );
 }
 
-export function BackLink() {
-  return (
-    <Link href="/app" aria-label="Back to all sessions" className={iconBtn}>
-      <ChevronLeftIcon size={22} />
-    </Link>
-  );
-}
+/** "‹ Back" for the focus screens' toolbars: back to where the student came from in the app. */
+export { default as BackLink } from "./BackLink";
 
 /**
  * A page's opening: eyebrow pill, bold title (pass a <Mark> around its key word) and a short lede.
@@ -77,16 +71,16 @@ export function PageHeader({
 }
 
 /**
- * The teal highlighter-marker swipe behind the key word of a page title. Keep trailing punctuation
+ * The lime highlighter-marker swipe behind the key word of a page title. Keep trailing punctuation
  * inside it (`<Mark>lost?</Mark>`): the marker is an inline-block, and Chrome would otherwise name
  * the heading "…lost ?".
  */
 export const Mark = Highlight;
 
-/** Section label inside a page (small, bold, uppercase ink). */
+/** Section heading inside a page (Bricolage, bold ink). */
 export function SectionTitle({ id, children, className = "" }: { id?: string; children: ReactNode; className?: string }) {
   return (
-    <h3 id={id} className={`px-1 text-[13px] font-bold tracking-wide text-ink uppercase ${className}`}>
+    <h3 id={id} className={`px-1 font-display text-lg font-bold text-ink ${className}`}>
       {children}
     </h3>
   );
@@ -98,21 +92,21 @@ export function Divider() {
 }
 
 /**
- * Ghost-ink switch. A real checkbox (role="switch") so it stays keyboard/AT friendly and keeps
+ * "Show erased ink" switch. A real checkbox (role="switch") so it stays keyboard/AT friendly and keeps
  * check()/uncheck() semantics; the whole label is the tap target.
  */
 export function GhostToggle({ checked, onChange }: { checked: boolean; onChange: (next: boolean) => void }) {
   return (
     <label
-      className={`press flex min-h-11 cursor-pointer select-none items-center gap-2.5 rounded-pill border px-3 text-sm font-medium ${
+      className={`press flex min-h-11 cursor-pointer select-none items-center gap-2.5 rounded-[13px] border-[1.5px] pr-2.5 pl-3.5 text-[15px] font-bold ${
         checked
-          ? "border-ghost/30 bg-ghost-soft text-ghost-strong"
+          ? "border-accent-line bg-accent-soft text-accent-strong"
           : "border-transparent text-ink-muted hover:bg-chrome-hover"
       }`}
     >
-      <GhostInkIcon size={18} className={checked ? "text-ghost" : "text-ink-subtle"} />
+      <GhostInkIcon size={18} className={checked ? "text-accent" : "text-ink-subtle"} />
       {/* Narrow phones: icon + switch only; the label stays for screen readers. */}
-      <span className="sr-only whitespace-nowrap sm:not-sr-only">Ghost ink</span>
+      <span className="sr-only whitespace-nowrap sm:not-sr-only">Show erased ink</span>
       <input
         type="checkbox"
         role="switch"

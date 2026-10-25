@@ -88,7 +88,8 @@ export function chunkBatch(
  */
 export function classifySaveFailure(status: number | "network"): "transient" | "permanent" {
   if (status === "network") return "transient";
-  if (status >= 500 || status === 408 || status === 429) return "transient";
+  // 401: signed out mid-session (expired cookie). Keep the ink queued until they sign back in.
+  if (status >= 500 || status === 401 || status === 408 || status === 429) return "transient";
   return "permanent";
 }
 

@@ -9,7 +9,7 @@ import type { Stroke } from '../types';
 // Postgres-specific behaviour (the shared contract is in dbContract.test.ts): connection options,
 // versioned migrations, the translated schema, the ink_samples series and graceful degradation
 // without TimescaleDB — on embedded PGlite.
-const dir = mkdtempSync(join(tmpdir(), 'inkling-pg-'));
+const dir = mkdtempSync(join(tmpdir(), 'traceit-pg-'));
 
 afterAll(() => {
   rmSync(dir, { recursive: true, force: true });
@@ -225,21 +225,21 @@ describe('PostgresDb on PGlite', () => {
 });
 
 describe('getDb backend selection', () => {
-  const g = globalThis as unknown as { __inklingDb?: { close(): Promise<void> } };
+  const g = globalThis as unknown as { __traceitDb?: { close(): Promise<void> } };
 
   it('uses Postgres when DATABASE_URL is set and SQLite otherwise', async () => {
-    const saved = { url: process.env.DATABASE_URL, path: process.env.INKLING_DB_PATH, db: g.__inklingDb };
+    const saved = { url: process.env.DATABASE_URL, path: process.env.TRACEIT_DB_PATH, db: g.__traceitDb };
     try {
       const { getDb } = await import('../db');
-      delete g.__inklingDb;
+      delete g.__traceitDb;
       process.env.DATABASE_URL = 'pglite:memory';
       const pg = getDb();
       expect(await pg.info()).toEqual({ backend: 'postgres', timescale: false });
       await pg.close();
 
-      delete g.__inklingDb;
+      delete g.__traceitDb;
       process.env.DATABASE_URL = '';
-      process.env.INKLING_DB_PATH = join(dir, 'select.db');
+      process.env.TRACEIT_DB_PATH = join(dir, 'select.db');
       const lite = getDb();
       expect(await lite.info()).toEqual({ backend: 'sqlite', timescale: false });
       await lite.close();
@@ -247,8 +247,8 @@ describe('getDb backend selection', () => {
       const restore = (key: string, value: string | undefined) =>
         value === undefined ? delete process.env[key] : (process.env[key] = value);
       restore('DATABASE_URL', saved.url);
-      restore('INKLING_DB_PATH', saved.path);
-      g.__inklingDb = saved.db;
+      restore('TRACEIT_DB_PATH', saved.path);
+      g.__traceitDb = saved.db;
     }
   }, 60_000);
 });

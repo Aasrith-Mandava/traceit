@@ -1,12 +1,20 @@
 import { expect, test, type Page } from "@playwright/test";
 
 const SECTIONS = ["top", "demo", "try", "how", "features", "audiences", "privacy", "faq"];
-const HEADLINE = "Every other app deletes your mistakes. We keep them.";
+const HEADLINE = "Your eraser is hiding the good stuff.";
 const APP_HREF = process.env.NEXT_PUBLIC_APP_URL || "/app";
 /** "See it in the demo" on the offline-demo build (DEMO_MODE=1, seeded): Maya's first review. */
 const DEMO_HREF = "/review/demo-maya-1";
-const NAV = ["#try", "#how", "#features", "#audiences", "#faq"];
+const NAV = ["#how", "#features", "#audiences", "#faq"];
 const HACKATHON = /hack\s?gt|hackathon/i;
+/** The flat lavender desk html paints behind the whole page (--color-desk #f3f2fb). */
+const DESK = "rgb(243, 242, 251)";
+/**
+ * Section titles with the drawn-in highlighter swipe, in page order. The dark "idea" band
+ * hand-letters its key word instead, the final CTA uses a static highlight and "Who it's for" is
+ * screen-reader only.
+ */
+const MARKED_TITLES = ["demo-title", "try-title", "features-title", "privacy-title", "faq-title"];
 
 /** Console errors and uncaught exceptions collected over a page's life. */
 function collectErrors(page: Page) {
@@ -18,27 +26,28 @@ function collectErrors(page: Page) {
   return errors;
 }
 
-/** Count WebGL contexts on canvases that are attached to the document (probe canvases don't count). */
+/**
+ * Record every WebGL context request, on any canvas or OffscreenCanvas, attached or not (probes
+ * count too) and whether or not it succeeds.
+ */
 async function trackWebGL(page: Page) {
   await page.addInitScript(() => {
-    const live = new Set<HTMLCanvasElement>();
-    (window as unknown as { __glCanvases: Set<HTMLCanvasElement> }).__glCanvases = live;
-    const orig = HTMLCanvasElement.prototype.getContext as (...a: unknown[]) => unknown;
-    Object.defineProperty(HTMLCanvasElement.prototype, "getContext", {
-      configurable: true,
-      value(this: HTMLCanvasElement, type: string, ...rest: unknown[]) {
-        const ctx = orig.call(this, type, ...rest);
-        if (ctx && (type === "webgl" || type === "webgl2" || type === "experimental-webgl")) live.add(this);
-        return ctx;
-      },
-    });
+    const requests: string[] = [];
+    (window as unknown as { __glRequests: string[] }).__glRequests = requests;
+    const protos = [HTMLCanvasElement.prototype, typeof OffscreenCanvas === "undefined" ? null : OffscreenCanvas.prototype];
+    for (const proto of protos) {
+      if (!proto) continue;
+      const orig = proto.getContext as (...a: unknown[]) => unknown;
+      Object.defineProperty(proto, "getContext", {
+        configurable: true,
+        value(this: unknown, type: string, ...rest: unknown[]) {
+          if (/webgl/i.test(type)) requests.push(type);
+          return orig.call(this, type, ...rest);
+        },
+      });
+    }
   });
-  return () =>
-    page.evaluate(
-      () =>
-        [...(window as unknown as { __glCanvases: Set<HTMLCanvasElement> }).__glCanvases].filter((c) => c.isConnected)
-          .length,
-    );
+  return () => page.evaluate(() => (window as unknown as { __glRequests: string[] }).__glRequests.length);
 }
 
 async function scrollThrough(page: Page) {
@@ -50,28 +59,28 @@ async function scrollThrough(page: Page) {
   });
 }
 
-const launcher = (page: Page) => page.locator('button[aria-controls="ask-inkling"]');
+const launcher = (page: Page) => page.locator('button[aria-controls="ask-traceit"]');
 
 test("light hero, sections, nav, CTAs, video and meta", async ({ page }) => {
   const errors = collectErrors(page);
   await page.goto("/welcome");
 
   await expect(page.getByRole("heading", { level: 1 })).toHaveText(HEADLINE);
-  await expect(page).toHaveTitle("Inkling — Handwriting intelligence for learners");
-  await expect(page.getByText("Handwriting intelligence for learners", { exact: true })).toBeVisible();
+  await expect(page).toHaveTitle("TraceIt — Study notes that learn from your mistakes");
+  const badge = page.locator("#top").getByText("Study notes that learn from your mistakes");
+  await expect(badge).toBeVisible();
+  await expect(badge.getByText("NEW", { exact: true })).toBeVisible();
 
-  // Light theme: html paints the paper; the page-wide liquid-metal layer is fixed behind everything.
-  await expect(page.locator('meta[name="theme-color"]')).toHaveAttribute("content", "#fbfbf8");
-  expect(await page.evaluate(() => getComputedStyle(document.documentElement).backgroundColor)).toBe(
-    "rgb(251, 251, 248)",
-  );
-  const bg = page.locator("[data-page-bg]");
-  await expect(bg).toHaveCount(1);
-  expect(await bg.evaluate((el) => [getComputedStyle(el).position, getComputedStyle(el).zIndex])).toEqual(["fixed", "-10"]);
-  const hasWebGL2 = await page.evaluate(() => !!document.createElement("canvas").getContext("webgl2"));
-  if (hasWebGL2) {
-    await expect(page.locator('[data-page-bg][data-liquid-metal="webgl"] > canvas')).toHaveCount(1);
-  }
+  // Light theme: html paints the flat lavender desk behind everything; the old liquid-metal page
+  // layer (WebGL with a CSS fallback) is gone, so nothing else paints the page background.
+  await expect(page.locator('meta[name="theme-color"]')).toHaveAttribute("content", "#f3f2fb");
+  expect(
+    await page.evaluate(() => {
+      const s = getComputedStyle(document.documentElement);
+      return [s.backgroundColor, s.backgroundImage];
+    }),
+  ).toEqual([DESK, "none"]);
+  await expect(page.locator("[data-page-bg], [data-liquid-metal]")).toHaveCount(0);
 
   for (const id of SECTIONS) await expect(page.locator(`section#${id}`)).toHaveCount(1);
 
@@ -80,15 +89,21 @@ test("light hero, sections, nav, CTAs, video and meta", async ({ page }) => {
     .evaluateAll((as) => as.map((a) => a.getAttribute("href")));
   expect(hrefs).toEqual(NAV);
 
-  const openLinks = page.getByRole("link", { name: "Open Inkling" });
-  expect(await openLinks.count()).toBeGreaterThanOrEqual(3); // header, hero, final CTA
-  for (const href of await openLinks.evaluateAll((as) => as.map((a) => a.getAttribute("href")))) expect(href).toBe(APP_HREF);
+  // Into the app from the header, the hero and the final CTA.
+  await expect(page.locator("header").getByRole("link", { name: "Launch TraceIt" })).toHaveAttribute("href", APP_HREF);
+  await expect(page.locator("#top").getByRole("link", { name: "Try the live demo" })).toHaveAttribute("href", APP_HREF);
+  await expect(
+    page.locator('section[aria-labelledby="cta-title"]').getByRole("link", { name: "Launch TraceIt" }),
+  ).toHaveAttribute("href", APP_HREF);
+  const appLinks = page.getByRole("link", { name: /^(Launch TraceIt|Try the live demo)$/ });
+  expect(await appLinks.count()).toBeGreaterThanOrEqual(3); // header, hero, final CTA
+  for (const href of await appLinks.evaluateAll((as) => as.map((a) => a.getAttribute("href")))) expect(href).toBe(APP_HREF);
 
   // Video: click-to-play, never autoplay.
   const video = page.locator("#demo video");
-  await expect(video).toHaveAttribute("poster", "/inkling-demo-poster.jpg");
+  await expect(video).toHaveAttribute("poster", "/traceit-demo-poster.jpg");
   await expect(video).toHaveAttribute("preload", "metadata");
-  await page.getByRole("link", { name: "Watch the demo" }).first().click();
+  await page.getByRole("link", { name: "See it in action" }).first().click();
   await expect(page).toHaveURL(/#demo$/);
   await page.getByRole("button", { name: /Play the demo video/ }).click();
   await expect.poll(() => video.evaluate((v: HTMLVideoElement) => !v.paused && v.currentTime > 0)).toBe(true);
@@ -99,7 +114,7 @@ test("light hero, sections, nav, CTAs, video and meta", async ({ page }) => {
   await expect(footer.getByText(/Attributions/)).toHaveCount(0);
   await expect(footer.getByText(/Paper Shaders/)).toHaveCount(0);
   await expect(page.locator("#demo").getByText(/MIT OpenCourseWare 18\.01/)).toBeVisible();
-  await expect(page.locator('meta[property="og:image"]')).toHaveAttribute("content", /\/inkling-demo-poster\.jpg$/);
+  await expect(page.locator('meta[property="og:image"]')).toHaveAttribute("content", /\/traceit-demo-poster\.jpg$/);
 
   await page.waitForTimeout(400);
   expect(errors).toEqual([]);
@@ -114,21 +129,23 @@ test("no hackathon wording anywhere (visible text, HTML, meta)", async ({ page }
   expect(await res.text()).not.toMatch(HACKATHON);
 });
 
-test("at most 2 live WebGL canvases (page background + orb), even after scrolling the whole page", async ({ page }) => {
-  const count = await trackWebGL(page);
+test("no WebGL contexts are created on the landing page, even after scrolling the whole page", async ({ page }) => {
+  const requests = await trackWebGL(page);
   await page.goto("/welcome");
   await page.waitForTimeout(1200);
   await scrollThrough(page);
   await page.waitForTimeout(800);
-  expect(await count()).toBeLessThanOrEqual(2);
-  // The fixed page background is the only live liquid-metal; small elements use the CSS path.
-  expect(await page.locator('[data-liquid-metal="webgl"]').count()).toBeLessThanOrEqual(1);
-  expect(await page.locator('[data-liquid-metal="css"]').count()).toBeGreaterThan(3);
+  expect(await requests()).toBe(0);
+  // No liquid-metal surfaces of either kind; the one canvas left is Try it's 2D drawing area.
+  await expect(page.locator("[data-liquid-metal]")).toHaveCount(0);
+  const canvases = page.locator("canvas");
+  await expect(canvases).toHaveCount(1);
+  await expect(canvases).toHaveAttribute("data-testid", "tryit-canvas");
 });
 
 test("one continuous background: every section and the footer are transparent", async ({ page }) => {
   await page.goto("/welcome");
-  const ids = [...SECTIONS.map((id) => `section#${id}`), 'section[aria-label="Built with"]', 'section[aria-labelledby="cta-title"]', "footer", "main", "body"];
+  const ids = [...SECTIONS.map((id) => `section#${id}`), 'section[aria-labelledby="cta-title"]', "footer", "main", "body"];
   for (const sel of ids) {
     const [color, image] = await page
       .locator(sel)
@@ -137,24 +154,27 @@ test("one continuous background: every section and the footer are transparent", 
     expect(color, sel).toBe("rgba(0, 0, 0, 0)");
     expect(image, sel).toBe("none");
   }
+  // The tech list ("Built with") and the Tiger Data hotspot line were taken off the page on request.
+  await expect(page.getByRole("heading", { name: "Built with" })).toHaveCount(0);
+  await expect(page.getByText("TimescaleDB continuous aggregate")).toHaveCount(0);
 });
 
-test("Ask Inkling: opens, answers a starter question offline, traps focus, Esc closes", async ({ page }) => {
+test("Ask TraceIt: opens, answers a starter question offline, traps focus, Esc closes", async ({ page }) => {
   const errors = collectErrors(page);
   await page.goto("/welcome");
   await launcher(page).click();
-  const dialog = page.getByRole("dialog", { name: "Ask Inkling" });
+  const dialog = page.getByRole("dialog", { name: "Ask TraceIt" });
   await expect(dialog).toBeVisible();
-  await expect(dialog.getByRole("textbox", { name: "Ask a question about Inkling" })).toBeFocused();
+  await expect(dialog.getByRole("textbox", { name: "Ask a question about TraceIt" })).toBeFocused();
 
   await dialog.getByRole("button", { name: "Is my data private?" }).click();
   const answer = dialog.locator('[data-role="assistant"][data-status="done"]').last();
   await expect(answer).toContainText("local-first");
   await expect(dialog.getByTestId("offline-label")).toBeVisible();
-  await expect(page.locator('[role="status"][aria-live="polite"]').filter({ hasText: "Inkling:" })).toHaveCount(1);
+  await expect(page.locator('[role="status"][aria-live="polite"]').filter({ hasText: "TraceIt:" })).toHaveCount(1);
 
   // Typed question + Enter.
-  const box = dialog.getByRole("textbox", { name: "Ask a question about Inkling" });
+  const box = dialog.getByRole("textbox", { name: "Ask a question about TraceIt" });
   await box.fill("Which languages?");
   await box.press("Enter");
   await expect(dialog.locator('[data-role="assistant"][data-status="done"]').last()).toContainText("Telugu");
@@ -181,8 +201,8 @@ test("Ask Inkling: opens, answers a starter question offline, traps focus, Esc c
 
 test("the FAQ's Ask button opens the assistant", async ({ page }) => {
   await page.goto("/welcome#faq");
-  await page.locator("#faq").getByRole("button", { name: "Ask Inkling" }).click();
-  await expect(page.getByRole("dialog", { name: "Ask Inkling" })).toBeVisible();
+  await page.locator("#faq").getByRole("button", { name: "Ask TraceIt" }).click();
+  await expect(page.getByRole("dialog", { name: "Ask TraceIt" })).toBeVisible();
 });
 
 test("/api/ask: same-origin only, size limits, offline fallback", async ({ request, baseURL }) => {
@@ -219,7 +239,7 @@ test("/api/ask: same-origin only, size limits, offline fallback", async ({ reque
   expect(await offTopic.text()).toMatch(/^I don't know/);
 });
 
-test("Try it: draw, erase to ghost ink, rewrite → Correction detected", async ({ page }) => {
+test("Try it: draw, erase to ghost ink, rewrite → you caught your own mistake", async ({ page }) => {
   const errors = collectErrors(page);
   await page.goto("/welcome#try");
   const canvas = page.getByTestId("tryit-canvas");
@@ -236,7 +256,7 @@ test("Try it: draw, erase to ghost ink, rewrite → Correction detected", async 
   };
 
   await scribble();
-  const counts = page.locator('dl[aria-label="What Inkling saw"] dd');
+  const counts = page.locator('dl[aria-label="What TraceIt saw"] dd');
   await expect(counts.nth(0)).toHaveText("1");
 
   await page.getByRole("button", { name: "Eraser", exact: true, pressed: false }).click();
@@ -248,25 +268,26 @@ test("Try it: draw, erase to ghost ink, rewrite → Correction detected", async 
   await expect(counts.nth(1)).toHaveText("1");
   await expect(page.getByTestId("correction-chip")).toHaveCount(0);
 
-  // Ghost ink is drawn (dashed teal pixels remain where the ink was).
-  const tealPixels = () =>
+  // Ghost ink is drawn (dashed light-indigo pixels, rgba(139,128,249,.8), remain where the ink was).
+  // Blue-dominant over both red and green; the default ink (#1d1a3a) is only ~30 bluer, so it never counts.
+  const ghostPixels = () =>
     canvas.evaluate((c: HTMLCanvasElement) => {
       const d = c.getContext("2d")!.getImageData(0, 0, c.width, c.height).data;
       let n = 0;
-      for (let i = 0; i < d.length; i += 4) if (d[i + 3] > 60 && d[i + 1] > d[i] + 40) n++;
+      for (let i = 0; i < d.length; i += 4) if (d[i + 3] > 60 && d[i + 2] > d[i] + 60 && d[i + 2] > d[i + 1] + 60) n++;
       return n;
     });
-  expect(await tealPixels()).toBeGreaterThan(20);
-  const ghostSwitch = page.getByRole("switch", { name: "Ghost ink" });
+  expect(await ghostPixels()).toBeGreaterThan(20);
+  const ghostSwitch = page.getByRole("switch", { name: "Show erased ink" });
   await ghostSwitch.click();
   await expect(ghostSwitch).toHaveAttribute("aria-checked", "false");
-  await expect.poll(tealPixels).toBe(0);
+  await expect.poll(ghostPixels).toBe(0);
   await ghostSwitch.click();
 
   await page.getByRole("button", { name: "Pen", exact: true }).click();
   await scribble();
   await expect(page.getByTestId("correction-chip")).toBeVisible();
-  await expect(page.getByTestId("correction-chip")).toContainText("Correction detected");
+  await expect(page.getByTestId("correction-chip")).toContainText("You caught your own mistake");
   await expect(counts.nth(2)).toHaveText("1");
 
   await page.getByRole("button", { name: "Reset" }).click();
@@ -357,7 +378,7 @@ test("feature cards open a detail sheet (click and keyboard), Esc closes and ret
   await card.click();
   const sheet = page.getByRole("dialog", { name: "Ghost ink" });
   await expect(sheet).toBeVisible();
-  await expect(sheet.getByRole("link", { name: /Try it in Inkling/ })).toHaveAttribute("href", APP_HREF);
+  await expect(sheet.getByRole("link", { name: /Try it in TraceIt/ })).toHaveAttribute("href", APP_HREF);
   for (let i = 0; i < 5; i++) {
     await page.keyboard.press("Tab");
     expect(await sheet.evaluate((d) => d.contains(document.activeElement))).toBe(true);
@@ -366,14 +387,15 @@ test("feature cards open a detail sheet (click and keyboard), Esc closes and ret
   await expect(sheet).toHaveCount(0);
   await expect(card).toBeFocused();
 
-  const teacher = page.locator('[data-feature="teacher"]');
-  await teacher.focus();
+  const notability = page.locator('[data-feature="notability"]');
+  await notability.focus();
   await page.keyboard.press("Enter");
-  const teacherSheet = page.getByRole("dialog", { name: "Teacher view" });
-  await expect(teacherSheet).toBeVisible();
-  await teacherSheet.getByRole("button", { name: "Close" }).click();
-  await expect(teacherSheet).toHaveCount(0);
-  await expect(teacher).toBeFocused();
+  const notabilitySheet = page.getByRole("dialog", { name: "Plays nice with Notability" });
+  await expect(notabilitySheet).toBeVisible();
+  await expect(notabilitySheet.getByRole("link", { name: /Try it in TraceIt/ })).toHaveAttribute("href", APP_HREF);
+  await notabilitySheet.getByRole("button", { name: "Close" }).click();
+  await expect(notabilitySheet).toHaveCount(0);
+  await expect(notability).toBeFocused();
   expect(errors).toEqual([]);
 });
 
@@ -400,10 +422,13 @@ test("Help in your language: picking a chip shows the sample in that language an
 
 test("section headings are bold with a highlighter swipe that draws in", async ({ page }) => {
   await page.goto("/welcome");
-  const markers = page.locator("h2 [data-marker]");
-  expect(await markers.count()).toBeGreaterThanOrEqual(8);
-  for (const id of ["try", "features", "faq"]) {
-    const h2 = page.locator(`#${id}-title`);
+  // Exactly these titles carry a swipe, one each, in page order.
+  await expect(page.locator("h2 [data-marker]")).toHaveCount(MARKED_TITLES.length);
+  expect(await page.locator("h2:has([data-marker])").evaluateAll((hs) => hs.map((h) => h.id))).toEqual(MARKED_TITLES);
+  // The final CTA's key word keeps a (static) highlighter band.
+  await expect(page.locator("#cta-title .hl")).toHaveCount(1);
+  for (const id of MARKED_TITLES) {
+    const h2 = page.locator(`#${id}`);
     expect(Number(await h2.evaluate((el) => getComputedStyle(el).fontWeight))).toBeGreaterThanOrEqual(700);
     await h2.scrollIntoViewIfNeeded();
     await expect.poll(() => h2.locator("[data-marker]").evaluate((el) => el.getBoundingClientRect().width)).toBeGreaterThan(30);
@@ -468,17 +493,19 @@ test("timeline fills once in view without hijacking scroll", async ({ page }) =>
 
 test.describe("reduced motion", () => {
   test.use({ reducedMotion: "reduce" });
-  test("static final states, CSS liquid metal, no console errors", async ({ page }) => {
+  test("static final states, flat static background, no console errors", async ({ page }) => {
     const errors = collectErrors(page);
     await page.goto("/welcome");
     await expect(page.getByRole("heading", { level: 1 })).toHaveText(HEADLINE);
     await page.waitForTimeout(600);
-    // No WebGL liquid metal: the same pearl gradient, fixed and static, across the whole page.
-    await expect(page.locator('[data-liquid-metal="webgl"]')).toHaveCount(0);
-    await expect(page.locator('[data-page-bg][data-liquid-metal="css"]')).toHaveCount(1);
-    const surface = page.locator("[data-page-bg] > span").first();
-    expect(await surface.evaluate((el) => getComputedStyle(el).animationName)).toBe("none");
-    expect(await surface.evaluate((el) => getComputedStyle(el).backgroundImage)).toMatch(/conic-gradient/);
+    // No liquid-metal layer: one flat, unanimated desk colour behind the whole page.
+    await expect(page.locator("[data-page-bg], [data-liquid-metal]")).toHaveCount(0);
+    expect(
+      await page.evaluate(() => {
+        const s = getComputedStyle(document.documentElement);
+        return [s.backgroundColor, s.backgroundImage, s.animationName];
+      }),
+    ).toEqual([DESK, "none", "none"]);
     // Story is static with every moment shown.
     await expect(page.locator('[data-story="static"]')).toHaveCount(1);
     await expect(page.locator('[data-story="static"] [data-moment]')).toHaveCount(3);
@@ -495,12 +522,21 @@ test.describe("reduced motion", () => {
     await page.getByRole("button", { name: "Show me" }).click();
     await expect(page.getByTestId("correction-chip")).toBeVisible();
     await scrollThrough(page);
+    // Nothing on the page loops (CSS or Web Animations) once everything has mounted.
+    expect(
+      await page.evaluate(
+        () =>
+          document
+            .getAnimations()
+            .filter((a) => a.playState === "running" && a.effect?.getComputedTiming().iterations === Infinity).length,
+      ),
+    ).toBe(0);
     expect(errors).toEqual([]);
   });
 });
 
 test.describe("no WebGL", () => {
-  test("falls back to CSS surfaces without errors", async ({ page }) => {
+  test("the page never needs WebGL: it renders and Try it draws without errors", async ({ page }) => {
     const errors = collectErrors(page);
     await page.addInitScript(() => {
       const orig = HTMLCanvasElement.prototype.getContext as (...args: unknown[]) => unknown;
@@ -513,18 +549,22 @@ test.describe("no WebGL", () => {
       });
     });
     await page.goto("/welcome");
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText(HEADLINE);
     await page.waitForTimeout(800);
     await expect(page.locator("#top canvas")).toHaveCount(0);
-    await expect(page.locator("[data-page-bg] canvas")).toHaveCount(0);
-    await expect(page.locator('[data-page-bg][data-liquid-metal="css"]')).toHaveCount(1);
-    expect(await page.locator("[data-page-bg]").evaluate((el) => getComputedStyle(el).position)).toBe("fixed");
+    // The same flat page background as with WebGL available.
+    expect(await page.evaluate(() => getComputedStyle(document.documentElement).backgroundColor)).toBe(DESK);
+    // Try it is a plain 2D canvas: "Show me" still writes, erases and pairs the correction.
+    await page.locator("#try").scrollIntoViewIfNeeded();
+    await page.getByRole("button", { name: "Show me" }).click();
+    await expect(page.getByTestId("correction-chip")).toBeVisible();
     expect(errors).toEqual([]);
   });
 });
 
 test.describe("mobile 390px", () => {
   test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
-  test("no horizontal overflow; orb and launcher clear of the hero copy; menu and chat work", async ({ page }) => {
+  test("no horizontal overflow; hero art and launcher clear of the hero copy; menu and chat work", async ({ page }) => {
     const errors = collectErrors(page);
     await page.goto("/welcome");
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
@@ -532,11 +572,12 @@ test.describe("mobile 390px", () => {
 
     const overlaps = (a: { x: number; y: number; width: number; height: number }, b: typeof a) =>
       !(a.x + a.width <= b.x || b.x + b.width <= a.x || a.y + a.height <= b.y || b.y + b.height <= a.y);
-    const orb = (await page.locator('#top svg[viewBox="0 0 100 100"]').boundingBox())!;
+    // The decorative notebook page (the hero art that replaced the orb) and the floating launcher.
+    const art = (await page.locator('#top > div[aria-hidden="true"]').boundingBox())!;
     const chat = (await launcher(page).boundingBox())!;
     for (const sel of ["#hero-title", '#top a[href="#demo"]', `#top a[href="${APP_HREF}"]`]) {
       const b = (await page.locator(sel).first().boundingBox())!;
-      expect(overlaps(orb, b), `orb overlaps ${sel}`).toBe(false);
+      expect(overlaps(art, b), `hero art overlaps ${sel}`).toBe(false);
       expect(overlaps(chat, b), `launcher overlaps ${sel}`).toBe(false);
     }
 
@@ -546,13 +587,19 @@ test.describe("mobile 390px", () => {
     expect(await page.evaluate(() => window.innerWidth)).toBe(390);
 
     await page.evaluate(() => window.scrollTo(0, 0));
+    // Escape closes the menu and hands focus back to its button.
     await page.getByRole("button", { name: "Open menu" }).click();
-    await page.locator("#mobile-menu").getByRole("link", { name: "Features" }).click();
+    await expect(page.locator("#mobile-menu")).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(page.locator("#mobile-menu")).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Open menu" })).toBeFocused();
+    await page.getByRole("button", { name: "Open menu" }).click();
+    await page.locator("#mobile-menu").getByRole("link", { name: "What’s inside" }).click();
     await expect(page).toHaveURL(/#features$/);
     await expect(page.locator("#mobile-menu")).toHaveCount(0);
 
     await launcher(page).tap();
-    const dialog = page.getByRole("dialog", { name: "Ask Inkling" });
+    const dialog = page.getByRole("dialog", { name: "Ask TraceIt" });
     await expect(dialog).toBeVisible();
     // Full-width sheet on phones (polled: it scales in).
     await expect.poll(async () => (await dialog.boundingBox())!.width).toBeGreaterThanOrEqual(388);
@@ -592,8 +639,8 @@ test.describe("screenshots", () => {
     await page.locator("#faq").evaluate((el) => el.scrollIntoView({ block: "start" }));
     await page.waitForTimeout(500);
     await launcher(page).click();
-    const dialog = page.getByRole("dialog", { name: "Ask Inkling" });
-    await dialog.getByRole("button", { name: "How does Inkling know I'm stuck?" }).click();
+    const dialog = page.getByRole("dialog", { name: "Ask TraceIt" });
+    await dialog.getByRole("button", { name: "How does TraceIt know I'm stuck?" }).click();
     await expect(dialog.locator('[data-role="assistant"][data-status="done"]')).toBeVisible();
     await page.waitForTimeout(600);
     await page.screenshot({ path: `${dir}/v3-${prefix}-chat.png` });

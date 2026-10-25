@@ -5,9 +5,9 @@ import Database from 'better-sqlite3';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 // Notability imports on a throwaway SQLite file: one current import per session, history kept.
-const dir = mkdtempSync(join(tmpdir(), 'inkling-notability-'));
+const dir = mkdtempSync(join(tmpdir(), 'traceit-notability-'));
 const file = join(dir, 'test.db');
-process.env.INKLING_DB_PATH = file;
+process.env.TRACEIT_DB_PATH = file;
 
 let db: ReturnType<typeof import('../db')['getDb']>;
 

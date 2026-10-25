@@ -1,10 +1,11 @@
 "use client";
 
-// "Try it": a tiny Inkling canvas. Write with a mouse, finger or Pencil (Pointer Events) in a
+// "Try it": a tiny TraceIt canvas. Write with a mouse, finger or Pencil (Pointer Events) in a
 // choice of pen size and colour, then erase — a real, partial eraser like the app's: only the ink
-// under the eraser goes, strokes split into pieces, and the erased parts stay as dashed teal ghost
-// ink. Rewrite in the same spot and the pair is flagged as a correction (lib/tryit.ts), the same
-// erase → rewrite idea the app uses, minus the lecture clock. Everything runs locally.
+// under the eraser goes, strokes split into pieces, and the erased parts stay as faded, dashed
+// ghost ink (light indigo, like the app's). Rewrite in the same spot and the pair is flagged as a
+// fix (lib/tryit.ts), the same erase → rewrite idea the app uses, minus the lecture clock.
+// Everything runs locally.
 //
 // Keyboard/screen-reader path: every control is a button or radio group, "Show me" plays the whole
 // sequence, and a polite live region narrates what happened.
@@ -29,13 +30,12 @@ import { layoutLine } from "./strokeFont";
 import { CheckIcon, EraserIcon, EyeIcon, PenIcon, PlayIcon, ResetIcon } from "./icons";
 import { RadioGroup } from "./RadioGroup";
 import { usePrefersReducedMotion } from "../motion/usePrefersReducedMotion";
-import { LiquidMetal } from "./ui/liquid-metal";
 
 type Tool = "pen" | "eraser";
 
 const SIZES = { fine: 1.5, medium: 3, bold: 5 } as const;
 type Size = keyof typeof SIZES;
-const COLORS = { ink: "#0f172a", blue: "#2563eb", teal: "#0d9488", red: "#dc2626" } as const;
+const COLORS = { ink: "#1d1a3a", blue: "#2563eb", green: "#047857", red: "#dc2626" } as const;
 type Color = keyof typeof COLORS;
 const ERASERS = { small: 10, large: 22 } as const;
 type EraserSize = keyof typeof ERASERS;
@@ -56,7 +56,8 @@ interface Correction {
   at: number;
 }
 
-const GHOST = "rgba(13, 148, 136, 0.62)";
+/** Ghost ink: the app's light indigo (--color-ghost #8b80f9), drawn dashed. */
+const GHOST = "rgba(139, 128, 249, 0.8)";
 const now = () => performance.now();
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
@@ -230,7 +231,7 @@ export function TryIt() {
         groups.current = groups.current.map((g) => (g.id === group.id ? { ...g, correctedBy: s.id } : g));
         setCorrections((cs) => [...cs, { id: s.id, groupId: group.id, bbox: unionBBox(group.bbox, s.bbox), at: t }]);
         setCounts((c) => ({ ...c, corrected: c.corrected + 1 }));
-        setStatus("Correction detected: your rewrite was paired with the ink you erased.");
+        setStatus("Fixed: you caught your own mistake. Your rewrite was paired with the ink you erased.");
         return;
       }
       // More strokes of the same rewrite grow the highlighted box.
@@ -282,8 +283,8 @@ export function TryIt() {
     setCounts((c) => ({ ...c, erased: c.erased + 1 }));
     setStatus(
       ghostRef.current
-        ? "Erased. The ink under the eraser is kept as ghost ink. Now rewrite it in the same spot."
-        : "Erased. Ghost ink is hidden, but Inkling still remembers it.",
+        ? "Erased. The ink under the eraser is kept as a ghost. Now write it again in the same spot."
+        : "Erased. Ghosts are hidden, but TraceIt still remembers them.",
     );
   }, []);
 
@@ -401,7 +402,7 @@ export function TryIt() {
     const token = demoToken.current;
     const alive = () => demoToken.current === token;
     setDemo(true);
-    setStatus("Playing an example: a derivative written, erased and rewritten.");
+    setStatus("Playing an example: a derivative written, rubbed out and written again.");
 
     const W = wrap.clientWidth;
     const H = wrap.clientHeight;
@@ -467,11 +468,11 @@ export function TryIt() {
     if (t === "pen") moveCursor(null);
   };
 
-  const summary = `${counts.written} stroke${counts.written === 1 ? "" : "s"} written, ${counts.erased} erase${counts.erased === 1 ? "" : "s"}, ${counts.corrected} correction${counts.corrected === 1 ? "" : "s"} detected.`;
+  const summary = `${counts.written} pen stroke${counts.written === 1 ? "" : "s"}, erased ${counts.erased} time${counts.erased === 1 ? "" : "s"}, ${counts.corrected} fix${counts.corrected === 1 ? "" : "es"} caught.`;
   const detected = counts.corrected > 0;
 
   const chip = (checked: boolean) =>
-    checked ? "bg-white shadow-sm ring-1 ring-teal-600/40" : "hover:bg-white/70";
+    checked ? "bg-white shadow-raised ring-2 ring-accent" : "hover:bg-white";
 
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.6fr)] lg:gap-10">
@@ -480,42 +481,42 @@ export function TryIt() {
         <ol className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
           {[
             { n: "1", title: "Write something", body: "A number, a word, an equation. Pick a pen size and colour." },
-            { n: "2", title: "Erase part of it", body: "Only the ink under the eraser goes, and it stays behind as dashed ghost ink." },
-            { n: "3", title: "Rewrite in the same spot", body: "Inkling pairs the rewrite with what you erased." },
+            { n: "2", title: "Rub part of it out", body: "Only the ink under the eraser goes, and it stays behind as a faded ghost." },
+            { n: "3", title: "Write it again, same spot", body: "TraceIt pairs the do-over with what you erased: that's a fix." },
           ].map((s) => (
-            <li key={s.n} className="card flex gap-4 p-4">
+            <li key={s.n} className="card flex gap-4 rounded-[18px] p-4">
               <span
                 aria-hidden="true"
-                className="inline-flex size-8 shrink-0 items-center justify-center rounded-full border border-teal-600/20 bg-accent-soft font-mono text-[13px] font-medium text-accent-strong"
+                className="inline-flex size-9 shrink-0 items-center justify-center rounded-md bg-accent-soft font-display text-[17px] font-extrabold text-accent"
               >
                 {s.n}
               </span>
               <div>
-                <h3 className="text-[15px] font-semibold text-ink">{s.title}</h3>
+                <h3 className="font-sans text-[16px] font-bold tracking-normal text-ink">{s.title}</h3>
                 <p className="mt-1 text-[14px] leading-relaxed text-pretty text-ink-muted">{s.body}</p>
               </div>
             </li>
           ))}
         </ol>
 
-        <dl className="grid grid-cols-3 gap-3" aria-label="What Inkling saw">
+        <dl className="grid grid-cols-3 gap-3" aria-label="What TraceIt saw">
           {[
-            { label: "Written", value: counts.written },
-            { label: "Erased", value: counts.erased },
-            { label: "Corrections", value: counts.corrected },
+            { label: "Pen strokes", value: counts.written },
+            { label: "Times erased", value: counts.erased },
+            { label: "Fixed", value: counts.corrected },
           ].map((m) => (
-            <div key={m.label} className="card rounded-xl px-4 py-3">
-              <dt className="text-[12px] tracking-wide text-ink-subtle uppercase">{m.label}</dt>
-              <dd className="mt-1 font-mono text-2xl text-ink tabular-nums">{m.value}</dd>
+            <div key={m.label} className="card rounded-md px-4 py-3">
+              <dt className="text-[12px] font-bold tracking-[0.08em] text-ink-subtle uppercase">{m.label}</dt>
+              <dd className="mt-1 font-display text-[28px] leading-none font-extrabold text-ink tabular-nums">{m.value}</dd>
             </div>
           ))}
         </dl>
       </div>
 
       {/* The canvas card */}
-      <div className="card overflow-hidden rounded-[1.4rem] p-1.5 shadow-page sm:p-2">
+      <div className="card overflow-hidden rounded-[24px] p-1.5 shadow-page sm:p-2">
         <div className="flex flex-wrap items-center justify-between gap-2 px-2 py-2 sm:px-3">
-          <div role="group" aria-label="Tool" className="flex rounded-full border border-line bg-chrome-hover p-1">
+          <div role="group" aria-label="Tool" className="flex rounded-md border border-line bg-desk p-1">
             {(
               [
                 { t: "pen", label: "Pen", Icon: PenIcon },
@@ -528,8 +529,8 @@ export function TryIt() {
                 aria-pressed={tool === t}
                 onClick={() => selectTool(t)}
                 disabled={demo}
-                className={`inline-flex min-h-11 items-center gap-2 rounded-full px-4 text-[14px] font-medium transition-[background-color,color] duration-200 disabled:opacity-50 ${
-                  tool === t ? "bg-ink text-white shadow-sm" : "text-ink-muted hover:bg-white hover:text-ink"
+                className={`inline-flex min-h-11 items-center gap-2 rounded-[10px] px-4 text-[14px] font-bold transition-[background-color,color] duration-200 disabled:opacity-50 ${
+                  tool === t ? "bg-ink text-white shadow-raised" : "text-ink-muted hover:bg-white hover:text-ink"
                 }`}
               >
                 <Icon size={16} />
@@ -544,36 +545,38 @@ export function TryIt() {
               role="switch"
               aria-checked={ghost}
               onClick={() => setGhost((g) => !g)}
-              className="inline-flex min-h-11 items-center gap-2.5 rounded-full px-3 text-[14px] text-ink-muted transition-colors hover:bg-chrome-hover hover:text-ink"
+              className="inline-flex min-h-11 items-center gap-2.5 rounded-md px-3 text-[14px] font-semibold text-ink-muted transition-colors hover:bg-chrome-hover hover:text-ink"
             >
               <span
                 aria-hidden="true"
-                className={`relative inline-flex h-5 w-9 items-center rounded-full border transition-colors duration-200 ${
-                  ghost ? "border-teal-600 bg-teal-600" : "border-line-strong bg-slate-200"
+                className={`relative inline-flex h-6 w-10 items-center rounded-pill transition-colors duration-200 ${
+                  ghost ? "bg-accent" : "bg-line"
                 }`}
               >
                 <span
-                  className={`absolute size-3.5 rounded-full bg-white shadow-sm transition-transform duration-200 ease-out ${
-                    ghost ? "translate-x-[1.2rem]" : "translate-x-[0.2rem]"
+                  className={`absolute size-[18px] rounded-full bg-white shadow-raised transition-transform duration-200 ease-out ${
+                    ghost ? "translate-x-[19px]" : "translate-x-[3px]"
                   }`}
                 />
               </span>
               <EyeIcon size={16} className="hidden sm:block" />
-              Ghost ink
+              Show erased ink
             </button>
             <button
               type="button"
               onClick={playDemo}
               disabled={demo}
-              className="inline-flex min-h-11 items-center gap-2 rounded-full px-3 text-[14px] font-medium text-accent-strong transition-colors hover:bg-accent-soft disabled:opacity-50"
+              className="inline-flex min-h-11 items-center gap-2 rounded-md px-3 text-[14px] font-bold text-accent-strong transition-colors hover:bg-accent-soft disabled:opacity-50"
             >
-              <PlayIcon size={13} />
+              <span aria-hidden="true" className="inline-flex size-6 items-center justify-center rounded-pill bg-highlight text-on-highlight">
+                <PlayIcon size={11} />
+              </span>
               Show me
             </button>
             <button
               type="button"
               onClick={reset}
-              className="inline-flex min-h-11 items-center gap-2 rounded-full px-3 text-[14px] text-ink-muted transition-colors hover:bg-chrome-hover hover:text-ink"
+              className="inline-flex min-h-11 items-center gap-2 rounded-md px-3 text-[14px] font-semibold text-ink-muted transition-colors hover:bg-chrome-hover hover:text-ink"
             >
               <ResetIcon size={16} />
               <span className="max-sm:sr-only">Reset</span>
@@ -620,11 +623,11 @@ export function TryIt() {
                   optionClassName={chip}
                   options={(Object.keys(COLORS) as Color[]).map((k) => ({
                     value: k,
-                    label: k === "ink" ? "Ink" : k === "blue" ? "Blue" : k === "teal" ? "Teal" : "Red",
+                    label: k === "ink" ? "Ink" : k === "blue" ? "Blue" : k === "green" ? "Green" : "Red",
                     children: (
                       <span
                         aria-hidden="true"
-                        className="size-5 rounded-full ring-2 ring-white shadow-[0_0_0_1px_rgb(15_23_42/0.2)]"
+                        className="size-5 rounded-full ring-2 ring-white shadow-[0_0_0_1px_rgb(22_19_43/0.2)]"
                         style={{ background: COLORS[k] }}
                       />
                     ),
@@ -650,7 +653,7 @@ export function TryIt() {
                     <>
                       <span
                         aria-hidden="true"
-                        className="rounded-full border-2 border-slate-500"
+                        className="rounded-full border-2 border-ink-subtle"
                         style={{ width: k === "small" ? 12 : 20, height: k === "small" ? 12 : 20 }}
                       />
                       {k === "small" ? "Small" : "Large"}
@@ -664,7 +667,7 @@ export function TryIt() {
 
         <div
           ref={wrapRef}
-          className="tryit-paper relative aspect-[4/3] w-full overflow-hidden rounded-[1rem] border border-line sm:aspect-[16/10]"
+          className="tryit-paper relative aspect-[4/3] w-full overflow-hidden rounded-[18px] border border-line sm:aspect-[16/10]"
         >
           <canvas
             ref={canvasRef}
@@ -688,7 +691,7 @@ export function TryIt() {
           <div
             ref={cursorRef}
             aria-hidden="true"
-            className="pointer-events-none absolute top-0 left-0 rounded-full border-2 border-slate-500 bg-slate-900/[0.04] opacity-0 shadow-[0_0_0_1px_rgba(255,255,255,.9)] transition-opacity duration-150"
+            className="pointer-events-none absolute top-0 left-0 rounded-full border-2 border-ink-subtle bg-ink/[0.04] opacity-0 shadow-[0_0_0_1px_rgba(255,255,255,.9)] transition-opacity duration-150"
           />
 
           {/* Correction outlines */}
@@ -699,15 +702,15 @@ export function TryIt() {
                 <motion.div
                   key={c.id}
                   aria-hidden="true"
-                  className="pointer-events-none absolute rounded-xl border-[1.5px] border-dashed border-cyan-600/80 bg-cyan-500/[0.06]"
+                  className="pointer-events-none absolute rounded-[10px] border-2 border-dashed border-corrected bg-corrected-soft/40"
                   style={{ left: x0, top: y0, width: x1 - x0, height: y1 - y0, transformOrigin: "center" }}
                   initial={reduce ? { opacity: 0 } : { opacity: 0, scale: 1.08 }}
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0 }}
                   transition={reduce ? { duration: 0 } : springs.snappy}
                 >
-                  <span className="absolute -top-3 left-3 rounded-full bg-cyan-700 px-2 py-0.5 font-mono text-[11px] font-semibold tracking-wide text-white uppercase">
-                    Corrected
+                  <span className="absolute -top-3 left-3 rounded-pill bg-ok-strong px-2 py-0.5 text-[11px] font-bold text-white">
+                    Fixed
                   </span>
                 </motion.div>
               );
@@ -725,11 +728,11 @@ export function TryIt() {
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0, transition: { duration: motionTokens.duration.fast } }}
               >
-                <span className="inline-flex size-12 items-center justify-center rounded-full border border-line bg-white text-ink-muted shadow-sm">
+                <span className="inline-flex size-12 items-center justify-center rounded-pill border border-line bg-white text-ink-muted shadow-raised">
                   <PenIcon size={20} />
                 </span>
-                <p className="font-display text-2xl text-ink-muted italic sm:text-3xl">Write anything here</p>
-                <p className="text-[13px] text-ink-subtle">or press “Show me”</p>
+                <p className="hand-note text-[32px] sm:text-[40px]">Write anything here</p>
+                <p className="text-[14px] text-ink-subtle">or press “Show me”</p>
               </motion.div>
             )}
           </AnimatePresence>
@@ -741,18 +744,17 @@ export function TryIt() {
                 <motion.p
                   key={`chip-${counts.corrected}`}
                   data-testid="correction-chip"
-                  className="relative isolate inline-flex items-center gap-2 overflow-hidden rounded-full py-1.5 pr-4 pl-1.5 text-[13px] font-semibold text-teal-950 shadow-[0_12px_28px_-12px_rgb(8_145_178/0.6)] ring-1 ring-teal-700/25"
+                  className="inline-flex items-center gap-2 rounded-pill bg-corrected-soft py-1.5 pr-4 pl-1.5 text-[14px] font-bold text-corrected-strong shadow-[0_12px_28px_-12px_rgb(4_108_78/0.55)] ring-1 ring-corrected/30"
                   initial={reduce ? { opacity: 0 } : { opacity: 0, y: -motionTokens.distance.md, scale: 0.9 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, transition: { duration: motionTokens.duration.fast } }}
                   transition={reduce ? { duration: 0 } : springs.bouncy}
                 >
-                  <LiquidMetal as="span" css variant="teal" aria-hidden="true" className="absolute inset-0 -z-10" />
-                  <span className="inline-flex size-6 items-center justify-center rounded-full bg-teal-700 text-white">
+                  <span className="inline-flex size-6 items-center justify-center rounded-full bg-ok-strong text-white">
                     <CheckIcon size={14} strokeWidth={2.4} />
                   </span>
-                  Correction detected
-                  <span className="hidden font-medium text-teal-900/80 sm:inline">· erase → rewrite paired</span>
+                  You caught your own mistake
+                  <span className="hidden font-semibold sm:inline">· erase → rewrite paired</span>
                 </motion.p>
               )}
             </AnimatePresence>
@@ -764,16 +766,16 @@ export function TryIt() {
 
         <div className="flex flex-wrap items-center gap-x-5 gap-y-2 px-3 py-3 text-[13px] text-ink-subtle">
           <span className="inline-flex items-center gap-2">
-            <span aria-hidden="true" className="h-0.5 w-5 rounded-full bg-ink" />
-            Ink
+            <span aria-hidden="true" className="h-0.5 w-5 rounded-full bg-pen" />
+            Your ink
           </span>
           <span className="inline-flex items-center gap-2">
-            <span aria-hidden="true" className="h-0 w-5 border-t-2 border-dashed border-teal-500" />
-            Ghost ink (erased)
+            <span aria-hidden="true" className="h-0 w-5 border-t-2 border-dashed border-ghost" />
+            Ghost (erased)
           </span>
           <span className="inline-flex items-center gap-2">
-            <span aria-hidden="true" className="size-3 rounded-[4px] border border-dashed border-cyan-600" />
-            Correction
+            <span aria-hidden="true" className="size-3 rounded-[4px] border-2 border-dashed border-corrected" />
+            Fixed
           </span>
           <span className="ml-auto hidden sm:inline">Runs in your browser. Nothing is uploaded.</span>
         </div>

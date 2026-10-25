@@ -24,7 +24,7 @@ async function drawStraight(page: Page, x0: number, y: number, x1: number) {
 
 type Pixels = { ink: number; ghost: number };
 
-/** Counts ink-dark and teal ghost-ink pixels in a CSS-px rectangle centred on (cx, cy) of a canvas. */
+/** Counts ink-dark (#1d1a3a) and light-indigo ghost-ink (#8b80f9 at 50 %) pixels in a CSS-px rectangle centred on (cx, cy) of a canvas. */
 async function pixelsAt(page: Page, testId: string, cx: number, cy: number, halfW: number, halfH: number) {
   return page.getByTestId(testId).evaluate(
     (el, [cx, cy, hw, hh]): Pixels => {
@@ -42,7 +42,7 @@ async function pixelsAt(page: Page, testId: string, cx: number, cy: number, half
       for (let i = 0; i < data.length; i += 4) {
         const [r, g, b, a] = [data[i], data[i + 1], data[i + 2], data[i + 3]];
         if (a > 150 && r < 90 && g < 90 && b < 90) ink++;
-        if (a > 20 && r < 100 && g > 110 && b < g + 8 && g - r > 60) ghost++;
+        if (a > 20 && r > 90 && b > 200 && b - r > 70 && b - g > 80) ghost++;
       }
       return { ink, ghost };
     },
@@ -78,11 +78,11 @@ test("rubbing the middle of a stroke erases only that part and keeps it as ghost
   // Two live pieces either side, one erased (ghost) piece in the middle.
   await expectCounts(page, "ink-canvas", 3, 2, 1);
   // Changed in Phase 8 (backlog "stroke counter"): the counter shows lines the student drew, not
-  // stored pieces — one line with its middle rubbed out is "1 stroke · 1 erased part" (it used to
+  // stored pieces — one line with its middle rubbed out is "1 pen stroke · 1 ghost" (it used to
   // read "2 strokes · 1 ghost"). The piece counts above are unchanged.
   await expect(canvas).toHaveAttribute("data-drawn-count", "1");
   await expect(canvas).toHaveAttribute("data-erased-part-count", "1");
-  await expect(page.getByTestId("stroke-counter")).toHaveText("1 stroke · 1 erased part");
+  await expect(page.getByTestId("stroke-counter")).toHaveText("1 pen stroke · 1 ghost");
 
   // Ghost off: the middle is blank, both ends are still ink.
   await expect(canvas).toHaveAttribute("data-ghost", "off");
@@ -90,7 +90,7 @@ test("rubbing the middle of a stroke erases only that part and keeps it as ghost
   expect((await pixelsAt(page, "ink-canvas", lx0 + 30, ly, 10, 4)).ink).toBeGreaterThan(5);
   expect((await pixelsAt(page, "ink-canvas", lx1 - 30, ly, 10, 4)).ink).toBeGreaterThan(5);
 
-  // Ghost on: the rubbed-out middle shows as teal ghost ink; the ends stay black.
+  // Ghost on: the rubbed-out middle shows as light-indigo ghost ink; the ends stay dark ink.
   await page.getByTestId("ghost-toggle").check();
   await expect(canvas).toHaveAttribute("data-ghost", "on");
   const middle = await pixelsAt(page, "ink-canvas", mid, ly, 20, 5);

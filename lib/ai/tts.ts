@@ -2,7 +2,7 @@ import "server-only";
 
 // Read-aloud voices. ElevenLabs when ELEVENLABS_API_KEY is set (voice ELEVENLABS_VOICE_ID), else
 // OpenAI TTS when OPENAI_API_KEY is set, else none (the client falls back to the browser's
-// speechSynthesis). Never on in tests (AI_PROVIDER=fake / INKLING_DISABLE_AI) or DEMO_MODE (offline).
+// speechSynthesis). Never on in tests (AI_PROVIDER=fake / TRACEIT_DISABLE_AI) or DEMO_MODE (offline).
 //
 // Other languages (multilingual help cards and recaps): ElevenLabs switches to a multilingual model
 // — Flash v2.5 by default (32 languages incl. all of ours but Telugu; low latency, half the credits
@@ -38,7 +38,7 @@ const safeToken = (v: string | null, fallback: string) => (v && /^[A-Za-z0-9_-]{
 export function selectTts(env: Env = process.env): { tts: TtsSelection | null; reason: string } {
   if (truthy(env.DEMO_MODE)) return { tts: null, reason: 'DEMO_MODE=1 (offline)' };
   if (envKey(env, 'AI_PROVIDER')?.toLowerCase() === 'fake') return { tts: null, reason: 'AI_PROVIDER=fake' };
-  if (truthy(env.INKLING_DISABLE_AI)) return { tts: null, reason: 'INKLING_DISABLE_AI=1' };
+  if (truthy(env.TRACEIT_DISABLE_AI ?? env.INKLING_DISABLE_AI)) return { tts: null, reason: 'TRACEIT_DISABLE_AI=1' };
   const eleven = envKey(env, 'ELEVENLABS_API_KEY');
   if (eleven) {
     return {

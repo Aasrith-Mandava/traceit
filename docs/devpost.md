@@ -1,4 +1,4 @@
-# Inkling: Devpost submission
+# TraceIt: Devpost submission
 
 > Demo video: https://youtu.be/HAl0wWfNS7U
 > Live app: https://www.inklingapp.tech (backup: https://inkling-production-fdf3.up.railway.app)
@@ -8,7 +8,7 @@
 
 ## Tagline
 
-**Every other app deletes your mistakes. Inkling keeps them, because that is where you learned.**
+**Every other app deletes your mistakes. TraceIt keeps them, because that is where you learned.**
 
 (Short version, under 60 characters: *Notes that keep your erased mistakes and re-teach them.*)
 
@@ -24,21 +24,21 @@ Notability already links what you wrote to when it was said. I wanted to add *ho
 
 ## What it does
 
-Inkling is a web note-taking canvas for lectures, designed for iPad and Apple Pencil (it also works with touch or a mouse).
+TraceIt is a web note-taking canvas for lectures, designed for iPad and Apple Pencil (it also works with touch or a mouse).
 
 - **Ghost ink.** The eraser never deletes. Erased handwriting stays on the page as dashed *ghost ink* that you can show or hide in review. Scribbling out and striking through also count as erasing.
 - **Hesitation detection against your own baseline.** The first two minutes of your writing set a personal baseline. After that, each 10-second window is scored on writing slower than usual, erasing more than usual, and going quiet while the lecturer keeps talking. Pen pressure is also used when the pen reports it. A live meter shows *steady*, *slowing* or *stuck* while you write.
-- **Erase-to-correction pairing.** Inkling groups erased strokes and looks for new writing in the same spot shortly afterwards. When the new ink overlaps the erased area enough, the two are paired as a before/after revision.
+- **Erase-to-correction pairing.** TraceIt groups erased strokes and looks for new writing in the same spot shortly afterwards. When the new ink overlaps the erased area enough, the two are paired as a before/after revision.
 - **A learning timeline.** Every session becomes a strip of moments pinned to the lecture's clock: **misconception corrected**, **unresolved gap**, and **breakthrough**. **Replay 20 s** plays the lecture around any moment, and open gaps carry into your next session until they are resolved.
-- **AI re-teaching.** For each moment, Inkling reads the before and after of your handwriting and what the lecturer was saying at that second. It then writes a short re-explanation (about 80 words) and one four-option check question. The answer is graded on the server. Answer correctly and the moment becomes a breakthrough.
+- **AI re-teaching.** For each moment, TraceIt reads the before and after of your handwriting and what the lecturer was saying at that second. It then writes a short re-explanation (about 80 words) and one four-option check question. The answer is graded on the server. Answer correctly and the moment becomes a breakthrough.
 - **10 languages, with voice.** Help cards, check questions and a spoken session recap are available in English, Spanish, Hindi, Mandarin Chinese, Arabic (right to left), French, Telugu, Korean, Vietnamese and Brazilian Portuguese. Any re-explanation can be read aloud.
-- **Works with Notability.** *Compare with Notability* overlays Inkling's process on a Notability PDF export of the same notes, side by side or with a slider, and counts what the final page hides. *Export for Notability* exports a session as a PDF (ghost ink, labelled moments, and a page of re-explanations) that you can import back into Notability.
+- **Works with Notability.** *Compare with Notability* overlays TraceIt's process on a Notability PDF export of the same notes, side by side or with a slider, and counts what the final page hides. *Export for Notability* exports a session as a PDF (ghost ink, labelled moments, and a page of re-explanations) that you can import back into Notability.
 - **Class and teacher views.** *Where the class slowed down* shows class-wide erasing per 30 seconds of the lecture. The teacher view proposes the three stretches most worth re-teaching. It is anonymous by design: no names or handwriting leave the analysis, and a count only appears once at least three students share it (k ≥ 3).
-- **Signal Lab and evaluation.** Every stroke is time-stamped to the lecture second it was written in. Every 10 seconds Inkling measures four pen signals against the student's own baseline (set by their first couple of minutes of writing): pausing while the lecturer keeps talking, writing slower than usual, erasing more than usual, and pen pressure when the device reports it. They combine into a smoothed "stuck" score over the whole lecture; each spike above the threshold becomes a moment on the timeline, linked to what the lecturer said, and gets a re-explanation and check question. Signal Lab charts all of this, so for every flagged moment you can see which signals fired and by how much. The detector was checked against hand labels of confusion **on a small labeled demo set, not a benchmark**, so a flagged moment is a strong hint, not a verdict.
+- **Signal Lab and evaluation.** Every stroke is time-stamped to the lecture second it was written in. Every 10 seconds TraceIt measures four pen signals against the student's own baseline (set by their first couple of minutes of writing): pausing while the lecturer keeps talking, writing slower than usual, erasing more than usual, and pen pressure when the device reports it. They combine into a smoothed "stuck" score over the whole lecture; each spike above the threshold becomes a moment on the timeline, linked to what the lecturer said, and gets a re-explanation and check question. Signal Lab charts all of this, so for every flagged moment you can see which signals fired and by how much. The detector was checked against hand labels of confusion **on a small labeled demo set, not a benchmark**, so a flagged moment is a strong hint, not a verdict.
 
 ## How we built it
 
-Inkling was built solo at HackGT 13 as a **Next.js 16** app (React, TypeScript, Tailwind).
+TraceIt was built at CalHacks 13.0 by Pranav Chowdary, Nagasai Kakani and Aasrith Mandava as a **Next.js 16** app (React, TypeScript, Tailwind).
 
 1. **Capture.** A lecture player and an ink canvas built on pointer events. Every stroke is stamped with the lecture time, and speed and pressure are recorded with it. Autosave retries on failure, and all writes are same-origin checked and size-limited.
 2. **Save.** A single repository interface with two backends: SQLite by default (no setup), or Postgres on **Tiger Data** with TimescaleDB (`lib/dbPostgres.ts`). The same test suite runs on both, using embedded PGlite for Postgres.
@@ -55,23 +55,23 @@ I used Notability Pro during the build as my research and design notebook. I rec
 
 | Screenshot | How Notability was used |
 | --- | --- |
-| ![Idea and problem](../notability-screenshots/01-idea-and-problem.png) `01-idea-and-problem.png` | In a Notability note I recorded the problem ("note apps keep only the final page"), the four candidate ideas I checked against prior art (three rejected, each with the reason), why Inkling was chosen, and the pitch. |
+| ![Idea and problem](../notability-screenshots/01-idea-and-problem.png) `01-idea-and-problem.png` | In a Notability note I recorded the problem ("note apps keep only the final page"), the four candidate ideas I checked against prior art (three rejected, each with the reason), why TraceIt was chosen, and the pitch. |
 | ![Architecture notes](../notability-screenshots/02-architecture.png) `02-architecture.png` | I wrote up the pipeline in Notability: capture → save → analyze → re-teach → review, with the modules and design decisions behind each stage. It mirrors the codebase's module layout. |
 | ![YouTube lecture with Smart Notes](../notability-screenshots/03-youtube-lecture-smart-notes.png) `03-youtube-lecture-smart-notes.png` | I imported MIT 18.01 Lecture 4 from YouTube into Notability to get its transcript, and used Smart Notes to summarize the differentiation rules so I could find the chain-rule segment. |
 | ![Note Chat on the chain-rule mistake](../notability-screenshots/04-note-chat-chain-rule-mistake.png) `04-note-chat-chain-rule-mistake.png` | I asked Note Chat where students get confused about the chain rule. It named writing `d/dx sin(x²) = cos(x²)` and forgetting the inner `2x`, which is exactly Maya's 01:40 correction in the demo. (It said the note had little readable transcript, so it answered from the standard chain-rule presentation.) |
 | ![Architecture diagram on the canvas](../notability-screenshots/05-architecture-diagram-canvas.png) `05-architecture-diagram-canvas.png` | On the Notability canvas I drew the six-stage pipeline (with Compare added) and sketched the core ghost-ink idea: a stroke whose erased middle stays as a dashed line, labelled "erased = kept as ghost ink". |
 
-**Inside the product:** *Compare with Notability* reads a Notability PDF export and overlays Inkling's process on the final page. *Export for Notability* (`lib/notabilityExport.ts`) produces a PDF you can import back into Notability, so the process sits next to your notes.
+**Inside the product:** *Compare with Notability* reads a Notability PDF export and overlays TraceIt's process on the final page. *Export for Notability* (`lib/notabilityExport.ts`) produces a PDF you can import back into Notability, so the process sits next to your notes.
 
 ## Sponsor tech
 
-**Notability ("Trust the Process").** Notability Pro was the planning and research tool for the build (see above), and the product is built to complement it: `components/CompareView.tsx` overlays a Notability PDF export with Inkling's ghost ink and moments and counts what the final page hides, and `lib/notabilityExport.ts` exports a session as a Notability-importable PDF.
+**Notability ("Trust the Process").** Notability Pro was the planning and research tool for the build (see above), and the product is built to complement it: `components/CompareView.tsx` overlays a Notability PDF export with TraceIt's ghost ink and moments and counts what the final page hides, and `lib/notabilityExport.ts` exports a session as a Notability-importable PDF.
 
 **Tiger Data (TimescaleDB on Postgres).** When `DATABASE_URL` points at Tiger Cloud, `lib/dbPostgres.ts` enables TimescaleDB and turns `ink_samples` into a **hypertable** (one summary row per stroke: speed, pressure, ink length and erased, keyed on lecture time). `GET /api/sessions/<id>/ink-stats` computes per-window statistics with **`time_bucket`**, including median speed via `percentile_cont`. A real-time **continuous aggregate**, `ink_lecture_hotspots`, rolls up class-wide ink per 30 seconds of lecture, with a refresh policy every minute. It powers *Where the class slowed down* on Progress and the erasing row of the teacher heatmap. On plain Postgres the same queries fall back to `date_bin` and return identical results.
 
 **Gemini API (`gemini-3.1-flash-lite`).** Gemini reads the handwriting. For each paired revision, the before and after crops are sent as images through Gemini's OpenAI-compatible endpoint (`lib/ai/gemini.ts`) with a strict JSON schema. It returns what changed, the likely misconception, and whether the edit was only cosmetic. That reading feeds the re-teaching prompt. Groq's own vision model is switched off in my configuration, so `lib/ai/select.ts` hands revision reading to the next configured provider, which is Gemini.
 
-**Groq (`openai/gpt-oss-120b`).** Groq writes the re-teaching (`lib/ai/groq.ts`, `lib/ai/prompts.ts`): the ~80-word re-explanation, the four-option check question, concept labels, and translations of help cards and recaps into the other nine languages. Translation keeps the options in their original positions, so the server-side answer key still grades them. It uses strict structured outputs with low reasoning effort. The landing page's *Ask Inkling* assistant also runs on Groq (`openai/gpt-oss-20b` by default). It streams answers grounded in a vetted fact sheet (`landing/lib/knowledge.ts`) and falls back to an offline FAQ matcher.
+**Groq (`openai/gpt-oss-120b`).** Groq writes the re-teaching (`lib/ai/groq.ts`, `lib/ai/prompts.ts`): the ~80-word re-explanation, the four-option check question, concept labels, and translations of help cards and recaps into the other nine languages. Translation keeps the options in their original positions, so the server-side answer key still grades them. It uses strict structured outputs with low reasoning effort. The landing page's *Ask TraceIt* assistant also runs on Groq (`openai/gpt-oss-20b` by default). It streams answers grounded in a vetted fact sheet (`landing/lib/knowledge.ts`) and falls back to an offline FAQ matcher.
 
 **ElevenLabs (`eleven_flash_v2_5`).** ElevenLabs is the read-aloud voice for re-explanations and for the spoken session recap (`lib/ai/tts.ts`). Flash v2.5 covers nine of the ten languages, with `language_code` enforced, and Telugu routes to `eleven_v3`. Audio is cached per text hash, so replays cost nothing. Without a key, the app falls back to the browser's `speechSynthesis`.
 
@@ -125,16 +125,16 @@ I used Notability Pro during the build as my research and design notebook. I rec
 Paste the one that matches each track question.
 
 **Oracle of the Deep (main track).**
-Inkling looks beneath the surface of a page of notes. The final page shows what a student ended up with, and Inkling surfaces the hidden layer underneath: the erased attempts, the hesitations, and the misconceptions they corrected. From pen signals alone it predicts where a student was confused, then explains every prediction. Signal Lab shows which signals fired in each 10-second window, and the evaluation page measures the detector against hand labels with precision, recall, and a threshold sweep. We report those numbers honestly as results on a small labeled demo set, not a benchmark.
+TraceIt looks beneath the surface of a page of notes. The final page shows what a student ended up with, and TraceIt surfaces the hidden layer underneath: the erased attempts, the hesitations, and the misconceptions they corrected. From pen signals alone it predicts where a student was confused, then explains every prediction. Signal Lab shows which signals fired in each 10-second window, and the evaluation page measures the detector against hand labels with precision, recall, and a threshold sweep. We report those numbers honestly as results on a small labeled demo set, not a benchmark.
 
 **Aramco, "A Marina's Mission" (alternative main track).** *[Check the prompt's wording and adjust.]*
-Inkling helps a learner find exactly where their understanding broke down and fix it. It turns erased mistakes and hesitations into a timeline of corrected misconceptions, open gaps and breakthroughs, each linked to the lecture moment and re-taught in the student's own language (10 languages, with voice). It is built for access: it runs offline on a laptop and a tablet, keeps data local, and gives teachers an anonymous view of where a whole class got lost.
+TraceIt helps a learner find exactly where their understanding broke down and fix it. It turns erased mistakes and hesitations into a timeline of corrected misconceptions, open gaps and breakthroughs, each linked to the lecture moment and re-taught in the student's own language (10 languages, with voice). It is built for access: it runs offline on a laptop and a tablet, keeps data local, and gives teachers an anonymous view of where a whole class got lost.
 
 **Notability ("Trust the Process").**
-Inkling is literally about trusting the process: it keeps the erased attempts and hesitations that every notes app throws away, because that is where learning happens. Notability Pro was part of my own process during the build. I recorded the idea and its prior-art check there, wrote up the architecture, drew the pipeline and the ghost-ink concept on the canvas, imported MIT 18.01 from YouTube to study the lecture with Smart Notes, and used Note Chat to confirm the typical chain-rule mistake that the demo is built around. The product also complements Notability: *Compare with Notability* overlays a Notability PDF export with the process it hides, and *Export for Notability* exports the session back as an importable PDF.
+TraceIt is literally about trusting the process: it keeps the erased attempts and hesitations that every notes app throws away, because that is where learning happens. Notability Pro was part of my own process during the build. I recorded the idea and its prior-art check there, wrote up the architecture, drew the pipeline and the ghost-ink concept on the canvas, imported MIT 18.01 from YouTube to study the lecture with Smart Notes, and used Note Chat to confirm the typical chain-rule mistake that the demo is built around. The product also complements Notability: *Compare with Notability* overlays a Notability PDF export with the process it hides, and *Export for Notability* exports the session back as an importable PDF.
 
 **Tiger Data.**
-Pen data is a time series, so Inkling stores it that way. On Tiger Cloud, every stroke writes a summary row into the `ink_samples` hypertable, keyed on lecture time. Per-window statistics use `time_bucket`, and the real-time continuous aggregate `ink_lecture_hotspots` rolls up class-wide erasing per 30 seconds of lecture, powering *Where the class slowed down* and the teacher heatmap. All of this lives in `lib/dbPostgres.ts`, with versioned migrations, TLS by default for remote hosts, and a `date_bin` fallback so the same queries return identical results on plain Postgres.
+Pen data is a time series, so TraceIt stores it that way. On Tiger Cloud, every stroke writes a summary row into the `ink_samples` hypertable, keyed on lecture time. Per-window statistics use `time_bucket`, and the real-time continuous aggregate `ink_lecture_hotspots` rolls up class-wide erasing per 30 seconds of lecture, powering *Where the class slowed down* and the teacher heatmap. All of this lives in `lib/dbPostgres.ts`, with versioned migrations, TLS by default for remote hosts, and a `date_bin` fallback so the same queries return identical results on plain Postgres.
 
 **MLH: Best use of Gemini API.**
 Gemini `gemini-3.1-flash-lite` reads students' handwriting. For every erase-and-rewrite, it receives the before and after crops and returns, under a strict JSON schema, what changed, the likely misconception, and whether the edit was only cosmetic. That reading is what lets the re-teaching say "you forgot the inner derivative" instead of offering generic help (`lib/ai/gemini.ts`, `lib/ai/select.ts`, `lib/ai/service.ts`).
@@ -146,4 +146,4 @@ ElevenLabs `eleven_flash_v2_5` reads each re-explanation and the session recap a
 See the Tiger Data answer above: a hypertable of pen samples, `time_bucket` window statistics, and a real-time continuous aggregate behind the class hotspot chart, all in `lib/dbPostgres.ts`.
 
 **MLH: .tech domain.**
-Inkling is served at https://inklingapp.tech, a .tech domain from get.tech. It is hosted on Railway: one Next.js service with SQLite on a persistent volume, running the offline public demo (`DEMO_MODE`), which resets itself every 30 minutes (`docs/railway.md`).
+TraceIt is served at https://inklingapp.tech, a .tech domain from get.tech. It is hosted on Railway: one Next.js service with SQLite on a persistent volume, running the offline public demo (`DEMO_MODE`), which resets itself every 30 minutes (`docs/railway.md`).

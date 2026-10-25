@@ -25,8 +25,8 @@ export async function renderFinalPagePdf(strokes: Stroke[], meta: { title: strin
   const height = y1 - y0;
   const doc = await PDFDocument.create();
   doc.setTitle(meta.title);
-  doc.setCreator("Inkling demo seed (scripts/seed-demo)");
-  doc.setProducer("Inkling demo seed");
+  doc.setCreator("TraceIt demo seed (scripts/seed-demo)");
+  doc.setProducer("TraceIt demo seed");
   if (meta.createdAt) {
     doc.setCreationDate(meta.createdAt);
     doc.setModificationDate(meta.createdAt);

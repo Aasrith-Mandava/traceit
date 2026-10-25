@@ -1,4 +1,4 @@
-# Inkling on Railway (or any Docker host): one Next.js server with SQLite on a persistent volume.
+# TraceIt on Railway (or any Docker host): one Next.js server with SQLite on a persistent volume.
 # See docs/railway.md. Build stage: the full Debian Node image, because npm runs node-gyp for
 # better-sqlite3 (a native addon; it finds the bundled linux prebuild, but gyp itself needs python3
 # and make, and a compiler is there should it ever have to build from source).
@@ -20,7 +20,7 @@ RUN npm run build && rm -r -f .next/cache
 # dev dependencies on purpose: `seed:demo` (run by scripts/start-prod.mjs) uses tsx.
 FROM node:22-bookworm-slim
 WORKDIR /app
-ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 PORT=3000 INKLING_DATA_DIR=/data
+ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 PORT=3000 TRACEIT_DATA_DIR=/data
 COPY --from=build /app /app
 EXPOSE 3000
 CMD ["node", "scripts/start-prod.mjs"]

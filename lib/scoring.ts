@@ -198,6 +198,27 @@ function assignPhases(
 }
 
 /**
+ * True when the student's writing touches fewer scoring windows than the baseline needs (`baselineMs`
+ * of writing: 12 ten-second windows). The baseline then never fills, so nothing can stand out yet.
+ * Counts the same ink as the baseline does (live pieces and ghosts; never undone strokes).
+ */
+export function writingBelowBaseline(
+  strokes: Stroke[],
+  config: Pick<ScoringConfigShape, 'windowMs' | 'baselineMs'> = SCORING_CONFIG,
+): boolean {
+  const need = Math.max(1, Math.floor(config.baselineMs / config.windowMs));
+  const touched = new Set<number>();
+  for (const s of activeStrokes(strokes)) {
+    if (s.erasedBy === 'undo') continue;
+    for (let i = Math.floor(s.startMs / config.windowMs); i <= Math.floor(s.endMs / config.windowMs); i++) {
+      touched.add(i);
+      if (touched.size >= need) return false;
+    }
+  }
+  return true;
+}
+
+/**
  * The stretch of lecture time the baseline was computed from: first baseline window to the end of
  * the last. Null for windows scored before phases existed (or with no baseline window).
  */

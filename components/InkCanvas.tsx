@@ -1,13 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { BBox, PointerKind, Point, Stroke, Tool } from "@/lib/types";
 import { splitLongStroke } from "@/lib/autosave";
 import { activeStrokes, inkCounts, newId, splitStrokeByEraser, type SplitResult, type XY } from "@/lib/ink";
 import { MAX_STROKE_POINTS } from "@/lib/validate";
 import { INK_COLOR, drawHighlight, drawStroke, drawStrokePath, renderRegion, renderStrokes } from "@/lib/render";
-
-export const ERASER_RADIUS = 12;
+import { ERASER_RADIUS } from "@/lib/toolSizes";
 
 interface InkCanvasProps {
   strokes: Stroke[];
@@ -16,7 +15,12 @@ interface InkCanvasProps {
   readOnly?: boolean;
   /** Current lecture clock in ms (audio.currentTime * 1000). */
   getLectureMs?: () => number;
-  onStrokeEnd?: (points: Point[], pointerType: PointerKind) => void;
+  /** `size` is the pen size the stroke was drawn with (the penSize at pen-down). */
+  onStrokeEnd?: (points: Point[], pointerType: PointerKind, size: number) => void;
+  /** Pen size multiplier for new ink (lib/toolSizes; 1 = Medium). Stored strokes draw with their own size. */
+  penSize?: number;
+  /** Eraser hit radius in CSS px (lib/toolSizes ERASER_SIZES). */
+  eraserRadius?: number;
   /**
    * Called once per eraser gesture that touched ink. `changed` holds every stroke to upsert: cut
    * parents (with replacedBy), their new pieces, and strokes erased in place. `erasedIds` are the
@@ -27,12 +31,16 @@ interface InkCanvasProps {
   className?: string;
   /** Read-only overlay: a dashed outline around a region of the page (e.g. the selected moment). */
   highlight?: { bbox: BBox; color: string } | null;
+  /** Decorative overlay on the page (e.g. the empty-page hint); must not take pointer events. */
+  children?: ReactNode;
 }
 
 interface ActiveGesture {
   pointerId: number;
   pointerType: PointerKind;
   tool: Tool;
+  /** Pen size for this stroke, fixed at pen-down. */
+  size: number;
   startLectureMs: number;
   startTimeStamp: number;
   points: Point[];
@@ -42,6 +50,8 @@ interface ActiveGesture {
 /** Eraser drag state. Each touched stroke is re-cut from its pre-gesture form using the whole path. */
 interface EraseState {
   path: XY[];
+  /** Hit radius for this gesture, fixed at pointer-down. */
+  radius: number;
   /** Live strokes at gesture start (the only ones the eraser can cut). */
   candidates: Stroke[];
   results: Map<string, SplitResult>;
@@ -76,6 +86,9 @@ export default function InkCanvas({
   testId = "ink-canvas",
   className = "",
   highlight = null,
+  penSize = 1,
+  eraserRadius = ERASER_RADIUS,
+  children,
 }: InkCanvasProps) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -135,7 +148,7 @@ export default function InkCanvas({
         ctx.lineCap = "round";
         ctx.strokeStyle = INK_COLOR;
         ctx.fillStyle = INK_COLOR;
-        drawStrokePath(ctx, g.points, g.pointerType);
+        drawStrokePath(ctx, g.points, g.pointerType, g.size);
         ctx.restore();
       }
       if (highlight) drawHighlight(ctx, highlight.bbox, highlight.color);
@@ -160,7 +173,7 @@ export default function InkCanvas({
     if (!st) return;
     const prev = st.path[st.path.length - 1] ?? [x, y];
     st.path.push([x, y]);
-    const r = ERASER_RADIUS;
+    const r = st.radius;
     const seg: BBox = [Math.min(prev[0], x) - r, Math.min(prev[1], y) - r, Math.max(prev[0], x) + r, Math.max(prev[1], y) + r];
     let dirty: BBox | null = null;
     for (const s of st.candidates) {
@@ -186,7 +199,7 @@ export default function InkCanvas({
     ctx.lineCap = "round";
     ctx.strokeStyle = INK_COLOR;
     ctx.fillStyle = INK_COLOR;
-    drawStrokePath(ctx, g.points.slice(Math.max(0, from - 1)), g.pointerType);
+    drawStrokePath(ctx, g.points.slice(Math.max(0, from - 1)), g.pointerType, g.size);
     ctx.restore();
   };
 
@@ -203,6 +216,7 @@ export default function InkCanvas({
       pointerId: e.pointerId,
       pointerType: kind,
       tool,
+      size: penSize,
       startLectureMs: getLectureMs?.() ?? 0,
       startTimeStamp: e.nativeEvent.timeStamp,
       points: [],
@@ -210,6 +224,7 @@ export default function InkCanvas({
         tool === "eraser"
           ? {
               path: [],
+              radius: eraserRadius,
               candidates: activeStrokes(strokes).filter((s) => !s.erased),
               results: new Map(),
               touchedAtMs: new Map(),
@@ -242,7 +257,7 @@ export default function InkCanvas({
         // one from the same point, so no stroke exceeds what the server stores per stroke.
         const pieces = splitLongStroke(g.points, MAX_STROKE_POINTS);
         g.points = pieces.pop()!;
-        for (const piece of pieces) onStrokeEnd?.(piece, g.pointerType);
+        for (const piece of pieces) onStrokeEnd?.(piece, g.pointerType, g.size);
       }
     } else {
       for (const ev of events) {
@@ -257,7 +272,7 @@ export default function InkCanvas({
     if (!g || e.pointerId !== g.pointerId) return;
     gestureRef.current = null;
     if (g.tool === "pen") {
-      if (g.points.length > 0) onStrokeEnd?.(g.points, g.pointerType);
+      if (g.points.length > 0) onStrokeEnd?.(g.points, g.pointerType, g.size);
     } else if (g.erase && g.erase.results.size > 0) {
       const changed: Stroke[] = [];
       const erasedIds: string[] = [];
@@ -308,6 +323,7 @@ export default function InkCanvas({
         onPointerCancel={finish}
         onContextMenu={(e) => e.preventDefault()}
       />
+      {children}
     </div>
   );
 }

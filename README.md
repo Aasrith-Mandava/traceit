@@ -1,217 +1,233 @@
-# Inkling
+# TraceIt
 
-**Every other app deletes your mistakes. We keep them.**
+**Your eraser is hiding the good stuff.**
 
-**Live:** <https://www.inklingapp.tech> · **Demo video (2:59):** <https://youtu.be/HAl0wWfNS7U>
+**Live demo:** <your Railway URL> · **Demo video:** <link>
 
-Inkling is a note-taking canvas for lectures (built for the iPad + Pencil) that keeps what you erase.
-Erased handwriting stays as _ghost ink_; Inkling notices where you hesitated (slower writing,
-erasing, going quiet while the lecturer keeps talking), pairs each erase with its correction, and
-links every moment to that point in the lecture. The review turns a session into a learning timeline —
-**corrected misconceptions**, **unresolved gaps** and **breakthroughs** — with an AI re-explanation and
-a check question for each, gaps that follow you into your next session, and a side-by-side with your
-Notability export that shows what the final page hides.
+TraceIt is a handwriting notes app for lectures (made for a tablet and stylus) that
+keeps what you erase. Erased ink stays as _ghost ink_. TraceIt notices where you hesitated (slower
+writing, erasing, going quiet while the lecture moves on), pairs each erase with what you wrote instead,
+and links every moment to that point in the lecture. Study mode then walks you through the moments that
+matter, and teachers see where the whole class got stuck.
 
-Built solo at HackGT 13.
+TraceIt — our CalHacks 13.0 project, by Pranav Chowdary, Nagasai Kakani and Aasrith Mandava.
 
-## Run it
+## Features
+
+**Students**
+
+- **Sign in / Sign up**: email and password, as a Student or a Teacher.
+- **My notes** (`/app`): your sessions, lectures and classes.
+- **Writing screen** (`/session/[id]`): Pen (Fine / Medium / Bold), Eraser (Small / Large), Undo and
+  **Show erased ink**. Write alongside an uploaded lecture (the player) or a **live lecture** with browser
+  captions. A hesitation meter shows how you're doing as you write. **Finish & review** takes you to Study mode.
+- **Study mode** (`/review/[id]`): a guided review that opens the most important moment first and steps
+  through the rest (‹ 2 of N ›, **Next moment →**, until **All caught up**). Each moment shows:
+  - **Why we flagged this**
+  - **First try vs second try** (the erased attempt next to the rewrite)
+  - **What the lecture said**, with **Play this part**
+  - a **Quick self-test** in 10 languages, and **Read it to me**
+
+  Also on this screen: **Download PDF**, **Keep writing** and **Done**.
+- **Moment types**: **Fixed** (you corrected it), **Still fuzzy** (not resolved yet) and **Aha moment**.
+- **My progress** (`/progress`): your fuzzy spots, which clear as you revisit and fix them.
+
+**Teachers**
+
+- **Classes** (`/classes`): create a class and share its join code; students join at `/join/<code>`.
+- **Class insights** (`/teacher/[lectureId]`): an anonymous heatmap of where enrolled students hesitated.
+  A spot shows only when at least 3 students hit it (k ≥ 3). It also lists 3 moments worth re-teaching.
+
+**Hidden demo pages** (reachable by URL only): `/compare/<sessionId>` (TraceIt's process laid over a
+Notability PDF export of the same notes), `/insights/<sessionId>` and `/insights/evaluation`.
+
+The landing page is `/welcome` (`/` redirects there). It has an **Ask TraceIt** chat (`POST /api/ask`).
+
+## Quick start
+
+Node 22+.
 
 ```bash
 npm install
-cp .env.local.example .env.local   # optional: AI / voice keys, Postgres URL (everything works without)
-npm run dev                          # http://localhost:3000 → /welcome
+cp .env.local.example .env.local   # optional: add GROQ_API_KEY=gsk_… for live AI
+npm run dev                          # http://localhost:3000
+npm run seed:demo                    # optional: Maya's sample notes (idempotent; -- --reset rebuilds them)
+npm run demo                         # demo mode: seed + production build (if stale) + next start, DEMO_MODE=1
 ```
 
-One site: `/welcome` is the marketing page (with the "Ask Inkling" assistant, `POST /api/ask`), `/app`
-is the app's home, and `/` redirects to `/welcome`. The two have separate root layouts and stylesheets
-(`app/(marketing)` and `app/(product)`); the other app routes (`/session/…`, `/review/…`, `/compare/…`,
-`/progress`, …) and every API under `/api` are unchanged. `landing/` is the former standalone
-marketing site, kept for reference only (not built, typechecked or linted).
+Everything works **without any keys**. AI features fall back to built-in answers or show a quiet "needs an
+API key" note, and read-aloud uses the browser's voice. Data is stored in a local SQLite file
+(`data/traceit.db`) unless `DATABASE_URL` is set.
 
-Node 22+. Everything is stored in a local SQLite file (`data/inkling.db`) unless `DATABASE_URL` is set.
+`npm run demo` serves on `0.0.0.0:3000` and prints the LAN address, so you can open it on a tablet on the
+same Wi-Fi. Options: `--reset | --no-build | --build | --port 3001 | --host 127.0.0.1`.
 
-## The demo
+## Demo mode
 
-```bash
-npm run seed:demo            # add Maya's demo sessions (idempotent)
-npm run seed:demo -- --reset # rebuild them after a rehearsal (touches nothing else)
-npm run demo                 # seed + production build (only if stale) + next start, DEMO_MODE=1
-```
+`DEMO_MODE=1` turns the app into a public demo:
 
-`npm run demo` serves the production build on `0.0.0.0:3000` and prints the LAN address — open
-`http://<your-laptop-ip>:3000` on the iPad (same Wi-Fi or a hotspot). Options:
-`npm run demo -- --reset | --no-build | --build | --port 3001 | --host 127.0.0.1`.
+- `/signin` shows **Try the demo** (the shared guest student, Maya) and **Try the teacher view** (her
+  teacher, class "Calculus I", join code `MAYA2026`).
+- Sign-up, class creation, lecture uploads, Notability import, Whisper and Live lecture are off. They
+  answer 403, and their controls are shown disabled with a note. `PUBLIC_UPLOADS=1` re-enables
+  rate-limited lecture uploads.
+- Study-mode AI is served from hand-checked fixtures (`public/demo/ai-cache.json`). Nothing calls a model
+  except the landing chat, and only if `GROQ_API_KEY` is set.
+- Demo data resets itself: Maya's sessions are rebuilt every `DEMO_RESET_MINUTES` (default 30), and
+  visitor sessions are cleared. Real password accounts are never touched.
+- It runs fully offline once built: fonts are self-hosted, the pdf.js worker is bundled and voice falls
+  back to the browser.
 
-**It runs with no network at all.** DEMO_MODE serves hand-checked AI fixtures
-(`public/demo/ai-cache.json`) instead of calling a model, fonts are self-hosted by `next/font` at
-build time, the pdf.js worker is bundled, and read-aloud falls back to the browser's voice. Build once
-while online (`next build` downloads the fonts), then demo anywhere. `e2e/demo.spec.ts` walks the whole
-demo against the production server with every non-localhost request blocked.
+**What the seed creates.** Maya's Session 1 is on the bundled chain-rule lecture:
 
-What the seed creates (on SQLite or Postgres — whatever the app is using):
+- a **Fixed** moment: `d/dx sin(x²) = cos(x²)` erased and rewritten as `cos(x²) · 2x`
+- an **Aha moment**: `2(3x+1)` → `6(3x+1)`
+- a **Still fuzzy** spot: product rule vs chain rule, where she erased and went quiet
 
-- **Maya — Session 1** (yesterday, on the bundled chain-rule lecture): two columns of handwritten notes.
-  At 01:02 she stopped after the outer derivative, erased `2(3x+1)` and rewrote `6(3x+1)` — already
-  answered, a **breakthrough**. At 01:40 she wrote `d/dx sin(x²) = cos(x²)`, erased it and rewrote
-  `cos(x²) · 2x` — the **live correction** for the demo. At 04:10 (product vs chain rule) she slowed down,
-  erased her attempt and went quiet while the lecture moved on — a **gap**.
-- **Maya — Session 2** (today): rewatches that part and writes the example through calmly, which
-  resolves the gap by revisit.
-- A **Notability export** of Session 1 (a one-page PDF of the final page, generated with pdf-lib).
-- Five classmates' sessions (not listed on the home page) so "Where the class slowed down" has a shape.
+Session 2 revisits and clears the fuzzy spot. The seed also adds a Notability PDF export of Session 1 and
+five classmates' sessions, so Class insights has a shape.
 
-The two-minute path: **Home → Session 1 review → the 01:40 correction** (before/after crops, the AI
-reading "forgot the inner derivative", the re-explanation; answer the check question → **Breakthrough**)
-**→ the 04:10 gap** (Replay 20 s) **→ Compare with Notability** (overlay slider) **→ Progress** (gap
-resolved in Session 2, class hotspots) **→ About** (`/about`: backend, AI provider, voice, attribution).
+**The demo lecture** (`public/demo/`: audio, transcript and AI fixtures) is a synthetic, generated talk on
+the chain rule, so it needs no attribution. The landing page credits its lecture clip to MIT
+OpenCourseWare 18.01 (CC BY-NC-SA). If you add a real lecture, its file stays in `data/uploads`
+(gitignored). Never commit it, and respect its license.
 
-### The public demo (Railway)
+## AI and voice
 
-<https://inklingapp.tech> runs the same demo on Railway. It is one Docker service with SQLite on a `/data` volume and `DEMO_MODE=1`:
+Set a key for any **one** provider:
 
-- Uploads, Whisper and Live lecture answer 403, and their controls are shown disabled with a note.
-- Maya's sessions are rebuilt every 30 minutes.
+- **Groq** (recommended): text, Whisper transcription and the landing chat.
+- **OpenAI**, **Google Gemini** or **xAI Grok**.
 
-`npm run start:railway` is the entry point. [`docs/railway.md`](docs/railway.md) has the click-by-click setup, variables and DNS.
+`AI_PROVIDER` forces a provider. If it's unset, the first key found wins, in this order: OpenAI → Groq →
+Gemini → Grok.
 
-### Using a real lecture
+All four go through one OpenAI-compatible client (`lib/ai/compat.ts`). It uses strict JSON-schema output,
+a repair retry, a 10 s deadline, per-session rate limits and a result cache. The AI works on two inputs:
 
-Add it with **Add lecture** (audio or video, plus `.vtt`/`.srt` captions, or Whisper with an OpenAI
-or Groq key; files up to 25 MB). The lecture file stays in `data/uploads` (gitignored) — never
-commit it. For MIT OCW 18.01
-Lecture 4, the chain rule runs roughly 22:05–33:00; clip that part to keep the demo short. A lecture
-whose title mentions MIT / 18.01 / OpenCourseWare is credited on `/about` as
-_"Lecture: MIT OpenCourseWare 18.01 Single Variable Calculus, CC BY-NC-SA — ocw.mit.edu"_. The seeded
-demo always uses the bundled synthetic lecture (`public/demo/`), which needs no attribution.
+- **Revision crops**: vision reads the before/after images of a correction.
+- **Lecture text**: text writes the short re-explanation and a check question. The answer is graded on the
+  server and never sent to the client first.
+
+Lecture text and handwriting are treated as untrusted data in every prompt.
+
+**Groq vs Grok.** Groq is GroqCloud (`GROQ_API_KEY=gsk_…`). Grok is xAI's model (`XAI_API_KEY=xai-…`).
+They're different companies with different keys.
+
+On Groq:
+
+- Text uses `GROQ_MODEL` (default `openai/gpt-oss-120b`).
+- Handwriting revisions use `GROQ_VISION_MODEL` (default `qwen/qwen3.8-27b`; `none` turns it off).
+- Transcription uses Whisper (`whisper-large-v3-turbo`), but only when no OpenAI key is set. Files can be
+  up to 25 MB.
+
+**Read it to me** uses ElevenLabs if a key is set, else OpenAI TTS, else the browser's voice.
 
 ## Environment
 
-All optional; see `.env.local.example` for details. Keys are read on the server only and never logged.
+Every variable is optional. `.env.local.example` documents each one. Keys are read on the server only and
+are never logged. Old `INKLING_*` names are still accepted for every `TRACEIT_*` variable.
 
 | Variable | What it does |
 | --- | --- |
-| `AI_PROVIDER` | `openai` \| `groq` \| `gemini` \| `grok` \| `fake`; unset = first key found (OpenAI → Groq → Gemini → Grok) |
-| `OPENAI_API_KEY`, `OPENAI_MODEL` | AI re-teach (default `gpt-5-mini`), Whisper transcription, OpenAI TTS |
-| `GROQ_API_KEY` (`gsk_…`), `GROQ_MODEL`, `GROQ_VISION_MODEL`, `GROQ_BASE_URL` | Groq (default `openai/gpt-oss-120b`, vision `qwen/qwen3.8-27b`); Whisper transcription when there is no OpenAI key |
-| `GEMINI_API_KEY`, `GEMINI_MODEL` | Google Gemini via its OpenAI-compatible API (default `gemini-3.1-flash-lite`) |
-| `XAI_API_KEY` (`xai-…`), `XAI_MODEL` | xAI Grok (default `grok-4-fast-non-reasoning`) — not the same as Groq |
-| `ELEVENLABS_API_KEY`, `ELEVENLABS_VOICE_ID` | Read aloud with ElevenLabs (else OpenAI TTS, else the browser voice) |
-| `DEMO_MODE=1` | Offline demo: bundled AI fixtures for the demo lecture, never the network |
-| `AI_RATE_LIMIT`, `AI_MAX_CONCURRENCY`, `AI_PREFETCH` | Cost controls (fresh generations per session per 10 min, calls in flight, warm-up) |
-| `DATABASE_URL` | Postgres / Tiger Data instead of SQLite (`pglite:<dir>` for an embedded local Postgres) |
-| `INKLING_DB_PATH`, `INKLING_UPLOAD_DIR` | SQLite file and upload folder (defaults `data/inkling.db`, `data/uploads`) |
+| `AI_PROVIDER` | `openai` \| `groq` \| `gemini` \| `grok` \| `fake`; unset = first key found |
+| `GROQ_API_KEY`, `GROQ_MODEL`, `GROQ_VISION_MODEL` | Groq text, vision, Whisper and the landing chat |
+| `OPENAI_API_KEY`, `OPENAI_MODEL` | OpenAI (default `gpt-5-mini`), Whisper and TTS |
+| `GEMINI_API_KEY`, `GEMINI_MODEL` | Google Gemini via its OpenAI-compatible API |
+| `XAI_API_KEY`, `XAI_MODEL` | xAI Grok |
+| `ELEVENLABS_API_KEY`, `ELEVENLABS_VOICE_ID` | Read-aloud voice |
+| `DEMO_MODE=1` | Public demo mode (see above); `PUBLIC_UPLOADS=1` allows guest lecture uploads |
+| `AI_RATE_LIMIT`, `AI_MAX_CONCURRENCY`, `AI_PREFETCH` | Cost controls |
+| `DATABASE_URL` | Postgres / TimescaleDB instead of SQLite (`pglite:<dir>` = embedded local Postgres) |
+| `TRACEIT_DATA_DIR`, `TRACEIT_DB_PATH`, `TRACEIT_UPLOAD_DIR` | Where SQLite and uploads live (default `data/`) |
+| `TRACEIT_SESSION_DAYS` | How long a sign-in lasts (default 30) |
+| `TRACEIT_COOKIE_SECURE` | `auto` (default) \| `1` \| `0` |
+| `TRACEIT_ADOPT_LOCAL_DATA` | First account takes over pre-account notes (default `1`) |
+| `LANDING_AI_DISABLED`, `LANDING_AI_DAILY_CAP` | Landing chat controls |
+| `NEXT_PUBLIC_SITE_URL` | Absolute site URL for `og:image` (baked in at build time) |
 
-## Sponsor tech
+Accounts need **no auth secret**. Passwords are hashed with scrypt, and sign-in sessions are random tokens
+stored hashed.
 
-### Notability
+## Storage
 
-Notability Pro was my research and design notebook during the build. I recorded the idea and the
-prior-art check that led to Inkling there, wrote up and drew the pipeline (capture → save → analyze →
-re-teach → review → compare) on the canvas, and sketched the core idea: an erased stroke kept as
-ghost ink. To study the lecture, I imported MIT 18.01 Lecture 4 from YouTube, read it with Smart
-Notes, and used Note Chat to confirm the typical chain-rule mistake (`sin(x²)` → `cos(x²)`, missing
-the inner `2x`), which is the correction the demo is built around.
+The default is SQLite (`better-sqlite3`, `data/traceit.db`), with no setup. Set `DATABASE_URL` to a Postgres
+URL (for example a free Tiger Data / Timescale Cloud service) to use Postgres instead:
 
-| Idea and prior-art check | Architecture notes |
-| --- | --- |
-| ![Inkling idea and problem note in Notability](notability-screenshots/01-idea-and-problem.png) | ![Inkling architecture note in Notability](notability-screenshots/02-architecture.png) |
-| **Pipeline and ghost-ink sketch on the canvas** | **MIT 18.01 Lecture 4: YouTube-to-notes and Smart Notes** |
-| ![Architecture diagram drawn on the Notability canvas](notability-screenshots/05-architecture-diagram-canvas.png) | ![MIT 18.01 lecture transcript with Smart Notes in Notability](notability-screenshots/03-youtube-lecture-smart-notes.png) |
-| **Note Chat: the chain-rule mistake** | |
-| ![Note Chat answering where students get confused about the chain rule](notability-screenshots/04-note-chat-chain-rule-mistake.png) | |
+- Tables are created and migrated on first use.
+- Remote hosts use TLS by default.
+- `/api/health` shows `{ backend, timescale }`.
 
-In the app: **Compare with Notability** takes a Notability PDF export of the same notes and lays
-Inkling's process over the final page (side by side, or an overlay slider), with the count of what the
-final page hides — erased attempts, corrections, open gaps, breakthroughs.
+With TimescaleDB, `lib/dbPostgres.ts` adds three things:
 
-### OpenAI · Groq · Google Gemini · xAI Grok
+- an `ink_samples` hypertable (one summary row per stroke)
+- `time_bucket` window stats (`GET /api/sessions/<id>/ink-stats`)
+- a continuous aggregate of class-wide ink per 30 s of a lecture (`GET /api/lectures/<id>/hotspots`)
 
-One OpenAI-compatible client (`lib/ai/compat.ts`) with strict JSON-schema output, a repair retry, a
-10 s deadline, per-session rate limits and a result cache. With no `AI_PROVIDER`, the first key found
-wins: OpenAI → Groq → Gemini → Grok. `DEMO_MODE=1` (what `npm run demo` sets) never calls any of them.
-Vision reads the before/after crops of a
-correction ("what you changed", the likely misconception); text writes the ≤80-word re-explanation
-and a 4-option check question (the answer is graded on the server and never sent to the client
-first). Lecture text and handwriting are treated as untrusted data in every prompt.
-
-**Groq vs Grok.** Groq (GroqCloud, `GROQ_API_KEY=gsk_…`, `lib/ai/groq.ts`) and xAI's Grok
-(`XAI_API_KEY=xai-…`, `lib/ai/grok.ts`) are different companies and different keys. On Groq:
-
-- Text uses `GROQ_MODEL` (default `openai/gpt-oss-120b`: a production model with strict JSON-schema
-  structured outputs, asked for low reasoning effort). A model without strict structured outputs
-  falls back to JSON mode, with the same validators and repair retry.
-- Handwriting revisions use `GROQ_VISION_MODEL` (default `qwen/qwen3.8-27b`, Groq's vision model, a
-  preview model). If it is turned off (`none`) or rejects the request, the next provider with a key
-  reads the revision; without one, the moment shows "Couldn't read this revision right now" and
-  the text help still works.
-- Lecture transcription uses Groq Whisper (`whisper-large-v3-turbo`, word timestamps) when
-  `OPENAI_API_KEY` is not set. Direct uploads are capped at 25 MB; larger files get a clear error
-  (upload captions, or compress the audio to 16 kHz mono).
-- Read aloud is unchanged (ElevenLabs → OpenAI → browser voice): Groq's text-to-speech (Orpheus,
-  preview) takes at most 200 characters per request and returns WAV only, which doesn't fit the
-  cached MP3 re-explanations.
-
-To go live with Groq: put `GROQ_API_KEY=gsk_…` in `.env.local`, restart `npm run dev`, and open
-`/about` — it shows `Groq · openai/gpt-oss-120b`.
-
-### ElevenLabs
-
-**Read aloud** speaks the re-explanation with an ElevenLabs voice (`lib/ai/tts.ts`), cached per text.
-
-### Tiger Data (TimescaleDB)
-
-Inkling stores everything in a local SQLite file by default (`data/inkling.db`, no setup). To store
-it in Postgres on [Tiger Data](https://www.tigerdata.com/) (Timescale Cloud) instead:
-
-1. Create a free service in the Tiger Cloud console and copy its connection string.
-2. Put it in `.env.local` (see `.env.local.example`):
-   ```bash
-   DATABASE_URL=postgres://tsdbadmin:YOUR_PASSWORD@YOUR_SERVICE.YOUR_PROJECT.tsdb.cloud.timescale.com:PORT/tsdb?sslmode=require
-   ```
-3. Restart `npm run dev`. Tables are created on first use (versioned migrations in
-   `schema_migrations`), and the bundled demo lecture is seeded. `npm run seed:demo` seeds the demo there too.
-4. Open `/about` (or `/api/health`): it shows `Postgres + TimescaleDB (Tiger Data)`.
-
-Connections to any Postgres that is not on this machine use TLS by default, even without
-`sslmode` (or with `prefer` / `allow`): `require` semantics, certificate not verified. Plaintext is
-used only for local servers (`localhost`, `127.0.0.0/8`, `::1`, unix sockets) or with an explicit
-`sslmode=disable`; `sslmode=verify-full` / `verify-ca` also verify the certificate.
-
-What TimescaleDB is used for (`lib/dbPostgres.ts`):
-
-- **`ink_samples` hypertable.** Every live stroke also gets one summary row: speed, mean pressure,
-  ink length and erased, with its time column `lecture_ts` = 2000-01-01 + the stroke's lecture ms.
-  It is written in the same transaction as the stroke upsert.
-- **`time_bucket` window stats.** `GET /api/sessions/<id>/ink-stats?windowMs=10000` gives
-  per-window stroke count, erased count, total ink, median speed (`percentile_cont`) and mean pen
-  pressure.
-- **Continuous aggregate `ink_lecture_hotspots`.** It holds class-wide ink per 30 s of a lecture, is
-  real-time, and is refreshed every minute by a policy. `GET /api/lectures/<id>/hotspots` reads it, and
-  **Progress** draws it as **"Where the class slowed down"** (erasing per 30 s over every session of
-  the lecture); `/about` names the query that produced it.
-
-Without the extension (plain Postgres, or `DATABASE_URL=pglite:memory` for a local run with no
-server), the same queries run with `date_bin` on a plain table and give identical results;
-`/api/health` shows `"timescale": false`. On SQLite the same numbers are computed in TypeScript.
+Plain Postgres and SQLite compute the same numbers without the extension.
 
 ## Tests
 
 ```bash
 npx tsc --noEmit && npm run lint
-npx vitest run                     # unit + integration, on SQLite and on Postgres (embedded PGlite)
-npx playwright test                # e2e: dev server on :3100 (SQLite) + the production demo on :3101
-                                   # (projects: chromium, ai, demo, landing — /welcome with LANDING_AI_DISABLED=1)
-INKLING_TEST_PG=1 npx playwright test   # the same e2e suite on the Postgres repository (PGlite)
-TIMESCALE_TEST_URL=<throwaway service URL> npx vitest run lib/__tests__/dbTimescale.test.ts
+npm test                           # vitest: unit + integration, on SQLite and embedded Postgres (PGlite)
+npm run test:e2e                   # Playwright
+TRACEIT_TEST_PG=1 npm run test:e2e # the same e2e suite on the Postgres repository (PGlite)
 ```
 
-Playwright starts its own servers (ports 3100 and 3101 must be free); they build into their own
-folders (`INKLING_DIST_DIR=.next-e2e`, `.next-e2e-demo`), so they can run next to an everyday `npm run dev`. The `demo` project seeds a fresh
-database, builds for production when the source changed, and runs `e2e/demo.spec.ts` offline;
-screenshots of each stop go to `screenshots/demo-*.png`.
+Playwright starts its own servers, so ports **3100** and **3101** must be free:
+
+- **3100**: a dev server on SQLite with the fake AI provider.
+- **3101**: the production demo build (`DEMO_MODE=1`).
+
+They build into their own folders (`.next-e2e`, `.next-e2e-demo`), so they can run next to `npm run dev`.
+
+The test projects:
+
+| Project | What it covers |
+| --- | --- |
+| `setup` | Signs in the test accounts |
+| `chromium` | The core suite, with AI off |
+| `ai` | AI re-teach and multilingual help, on the fake provider |
+| `demo` | The seeded demo, offline, against the production build |
+| `landing` | `/welcome` and the Ask TraceIt chat, offline |
+
+## Deploy (Railway)
+
+1. On Railway, click **New project** → **Deploy from GitHub repo** → `Aasrith-Mandava/traceit` (branch
+   `main`). The repo's `railway.json` selects the `Dockerfile`.
+2. Add a **Volume** mounted at `/data`.
+3. Set these variables: `DEMO_MODE=1` and `TRACEIT_DATA_DIR=/data`. `GROQ_API_KEY` (for the landing chat
+   only) and `NEXT_PUBLIC_SITE_URL` are optional. Don't set `DATABASE_URL`.
+4. Go to **Networking** → **Generate domain** (target port 3000).
+
+Every push to `main` redeploys. The start script (`npm run start:railway` → `scripts/start-prod.mjs`)
+seeds the demo, then runs `next start`. The health check is `/api/health`.
+[`docs/railway.md`](docs/railway.md) covers the details: every variable, custom domains, the smoke test
+and the reset internals.
+
+## Project structure
+
+```text
+app/
+  (marketing)/welcome/   landing page + Ask TraceIt chat
+  (product)/             the app: signin, signup, app (My notes), session, review (Study mode),
+                         progress, classes, join, teacher (Class insights), lectures/new, account,
+                         compare / insights (hidden demo pages)
+  api/                   route handlers: auth, sessions, lectures, events, classes, progress, ask, health
+components/              UI: InkCanvas, SessionCapture, ReviewView, MomentDetail, HelpPanel,
+                         TeacherView, DeskShell (app shell), landing/, auth/, classes/
+lib/                     analysis (scoring, pairing, classify, moments, gaps), storage (db.ts SQLite,
+                         dbPostgres.ts), ai/ (providers, prompts, fixtures, TTS), auth/, demo seed + reset
+scripts/                 seed-demo, demo, start-prod (Railway), demo asset generators
+public/demo/             bundled lecture: audio, transcript, AI fixtures
+e2e/                     Playwright specs         lib/__tests__/  vitest
+docs/                    railway.md and write-ups
+Dockerfile, railway.json, instrumentation.ts (periodic demo reset)
+```
 
 ## Notes
 
-- `npm run seed:demo` runs TypeScript with `tsx` and generates the PDF with `pdf-lib` — both dev
-  dependencies, so seed from a normal `npm install` (not `--omit=dev`). The app itself never needs them.
-- `AGENTS.md` is generated by Next.js 16 (`next dev`); it points agents at the bundled Next docs.
+- `npm run seed:demo` uses `tsx` and `pdf-lib`. They're dev dependencies, so seed from a normal
+  `npm install`, not `--omit=dev`.
+- This is Next.js 16. `AGENTS.md` is generated by `next dev` and points agents at the bundled Next docs.

@@ -2,7 +2,7 @@ import "server-only";
 
 // "Send back to Notability": a session exported as a PDF a student can import into Notability (or
 // any notes app) to keep the process next to the final notes (GET /api/sessions/[id]/export).
-//   Page 1 — the notes: live ink on ruled paper, erased ink as dashed teal ghost ink, and each
+//   Page 1 — the notes: live ink on ruled paper, erased ink as dashed light-indigo ghost ink, and each
 //            moment outlined and labelled (Corrected / Gap / Breakthrough). Same frame as the compare
 //            screen (inkFrame), plus a legend strip at the bottom.
 //   Page 2 — the moments, in lecture order: time, type, what the AI read before → after, what the
@@ -17,9 +17,9 @@ import { formatClock } from "./time";
 import type { BBox, Revision, Stroke, TimelineEvent, TimelineEventType } from "./types";
 
 export const MOMENT_PDF_LABEL: Record<TimelineEventType, string> = {
-  misconception_corrected: "Corrected",
-  unresolved_gap: "Gap",
-  breakthrough: "Breakthrough",
+  misconception_corrected: "Fixed",
+  unresolved_gap: "Still fuzzy",
+  breakthrough: "Aha moment",
 };
 
 /** Long lecture excerpts are cut to this many words on page 2. */
@@ -45,21 +45,21 @@ const hex = (h: string): RGB => rgb(parseInt(h.slice(1, 3), 16) / 255, parseInt(
 
 // Mirrors the --color-* tokens in app/(product)/globals.css.
 const C = {
-  paper: hex("#fffffd"),
-  rule: hex("#dbe5ee"),
-  line: hex("#e2e8f0"),
+  paper: hex("#fffefb"),
+  rule: hex("#dce3f2"),
+  line: hex("#e4e2f0"),
   chrome: hex("#ffffff"),
-  ink: hex("#0f172a"),
-  muted: hex("#475569"),
-  subtle: hex("#526176"),
-  ghost: hex("#0d9488"),
+  ink: hex("#1d1a3a"),
+  muted: hex("#514d6b"),
+  subtle: hex("#625e7c"),
+  ghost: hex("#8b80f9"),
   white: rgb(1, 1, 1),
 };
 /** Outline colour and text-safe tag colour per moment type. */
 const MOMENT_COLOR: Record<TimelineEventType, { line: RGB; strong: RGB }> = {
-  misconception_corrected: { line: hex("#0284c7"), strong: hex("#075985") },
-  unresolved_gap: { line: hex("#d97706"), strong: hex("#92400e") },
-  breakthrough: { line: hex("#1e293b"), strong: hex("#0f172a") },
+  misconception_corrected: { line: hex("#0e9f6e"), strong: hex("#046c4e") },
+  unresolved_gap: { line: hex("#f08c00"), strong: hex("#8a4500") },
+  breakthrough: { line: hex("#e0338a"), strong: hex("#a3175e") },
 };
 
 // ---------------------------------------------------------------------------------------------
@@ -130,7 +130,7 @@ export function wrapText(text: string, maxWidth: number, measure: (s: string) =>
   return lines;
 }
 
-/** "inkling-<safe-title>.pdf": lowercase ASCII letters, digits and single dashes (max 60). */
+/** "traceit-<safe-title>.pdf": lowercase ASCII letters, digits and single dashes (max 60). */
 export function exportFileName(title: string): string {
   const safe = title
     .normalize("NFKD")
@@ -139,7 +139,7 @@ export function exportFileName(title: string): string {
     .replace(/[^a-z0-9]+/g, "-")
     .slice(0, 60)
     .replace(/^-+|-+$/g, "");
-  return `inkling-${safe || "notes"}.pdf`;
+  return `traceit-${safe || "notes"}.pdf`;
 }
 
 export interface MomentBlock {
@@ -167,7 +167,7 @@ export function momentBlocks(events: TimelineEvent[], revisions: Revision[]): Mo
         const cut = excerpt.length > EXCERPT_WORDS ? `${excerpt.slice(0, EXCERPT_WORDS).join(" ")}…` : excerpt.join(" ");
         lines.push({ label: "Lecture", text: `“${cut}”` });
       }
-      if (e.help?.reexplain) lines.push({ label: "Re-explanation", text: e.help.reexplain });
+      if (e.help?.reexplain) lines.push({ label: "Explanation", text: e.help.reexplain });
       if (e.type === "unresolved_gap") lines.push({ label: "Status", text: e.status === "resolved" ? "Resolved" : "Still open" });
       return {
         type: e.type,
@@ -219,7 +219,7 @@ function notesPage(doc: PDFDocument, fonts: Fonts, input: NotabilityExportInput)
       x: 0,
       y: height,
       borderColor: C.ghost,
-      borderWidth: 2.2,
+      borderWidth: 2.2 * (s.size ?? 1),
       borderOpacity: s.isScribble ? 0.3 : 0.75,
       borderDashArray: [6, 5],
       borderLineCap: LineCapStyle.Round,
@@ -232,7 +232,8 @@ function notesPage(doc: PDFDocument, fonts: Fonts, input: NotabilityExportInput)
       x: 0,
       y: height,
       borderColor: C.ink,
-      borderWidth: s.pointerType === "pen" ? 2.4 * (0.5 + (pressure > 0 ? pressure : 0.5)) : 2.4,
+      // Pen size (absent = Medium), times average pen pressure — as on the canvas (lib/render).
+      borderWidth: 2.4 * (s.size ?? 1) * (s.pointerType === "pen" ? 0.5 + (pressure > 0 ? pressure : 0.5) : 1),
       borderLineCap: LineCapStyle.Round,
     });
   }
@@ -298,7 +299,7 @@ function drawLegend(page: PDFPage, fonts: Fonts, title: string, width: number) {
     x += fonts.regular.widthOfTextAtSize(MOMENT_PDF_LABEL[type], size) + 12;
   }
   // The title, right-aligned, when there's room for it.
-  const label = toWinAnsi(`${title} · Inkling`, fonts.supported);
+  const label = toWinAnsi(`${title} · TraceIt`, fonts.supported);
   const w = fonts.regular.widthOfTextAtSize(label, size);
   if (x + w + 12 <= width) page.drawText(label, { x: width - w - 12, y, size, font: fonts.regular, color: C.subtle });
 }
@@ -334,7 +335,7 @@ function momentsPages(doc: PDFDocument, fonts: Fonts, input: NotabilityExportInp
   y -= 2;
   const created = (input.now ?? new Date()).toISOString().slice(0, 10);
   para(
-    [input.lectureTitle ? `Lecture: ${capChars(input.lectureTitle, 240)}` : null, `Exported from Inkling on ${created}`].filter(Boolean).join(" · "),
+    [input.lectureTitle ? `Lecture: ${capChars(input.lectureTitle, 240)}` : null, `Exported from TraceIt on ${created}`].filter(Boolean).join(" · "),
     fonts.regular,
     10,
     C.muted,
@@ -379,9 +380,9 @@ export async function buildNotabilityExport(input: NotabilityExportInput): Promi
   const now = input.now ?? new Date();
   // Document metadata is UTF-16: any title is fine here.
   doc.setTitle(input.title);
-  doc.setSubject("Inkling notes with ghost ink and learning moments");
-  doc.setCreator("Inkling");
-  doc.setProducer("Inkling");
+  doc.setSubject("TraceIt notes with ghost ink and learning moments");
+  doc.setCreator("TraceIt");
+  doc.setProducer("TraceIt");
   doc.setCreationDate(now);
   doc.setModificationDate(now);
   const regular = await doc.embedFont(StandardFonts.Helvetica);

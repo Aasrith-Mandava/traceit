@@ -325,9 +325,9 @@ export function formatDay(iso: string): string {
   return Number.isNaN(d.getTime()) ? '' : dayFmt.format(d);
 }
 
-/** Short "how" for lists: "Revisited", "You said you get it", "Check question". */
+/** Short "how" for lists: "Revisited", "You said you get it", "Self-test". */
 export const RESOLVED_SHORT: Record<ResolvedBy, string> = {
   revisit: 'Revisited',
   self: 'You said you get it',
-  check: 'Check question',
+  check: 'Self-test',
 };

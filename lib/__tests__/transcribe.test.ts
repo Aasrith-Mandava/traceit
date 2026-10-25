@@ -6,7 +6,7 @@ import fixture from './fixtures/whisper-verbose.json';
 import { TRANSCRIBE_MAX_BYTES, TranscribeError, selectTranscriber, transcribeFile } from '../transcribe';
 
 // Mocked fetch only: nothing here touches the network.
-const dir = mkdtempSync(join(tmpdir(), 'inkling-transcribe-'));
+const dir = mkdtempSync(join(tmpdir(), 'traceit-transcribe-'));
 const audio = join(dir, 'lecture.mp3');
 writeFileSync(audio, Buffer.from('ID3 fake mp3 bytes'));
 afterAll(() => rmSync(dir, { recursive: true, force: true }));
@@ -15,9 +15,9 @@ const json = (body: unknown, status = 200) => new Response(JSON.stringify(body),
 const GROQ = { GROQ_API_KEY: 'gsk_test' };
 
 describe('selectTranscriber', () => {
-  it('is off without a key, or with INKLING_DISABLE_AI=1', () => {
+  it('is off without a key, or with TRACEIT_DISABLE_AI=1', () => {
     expect(selectTranscriber({})).toBeNull();
-    expect(selectTranscriber({ ...GROQ, INKLING_DISABLE_AI: '1' })).toBeNull();
+    expect(selectTranscriber({ ...GROQ, TRACEIT_DISABLE_AI: '1' })).toBeNull();
     // The public demo never spends Whisper credits, even with a key set for the landing assistant.
     expect(selectTranscriber({ ...GROQ, DEMO_MODE: '1' })).toBeNull();
     expect(selectTranscriber({ OPENAI_API_KEY: '', GROQ_API_KEY: ' ' })).toBeNull();

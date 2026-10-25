@@ -38,13 +38,13 @@ describe('selectProvider', () => {
   });
 
   it('AI_PROVIDER=fake never needs a key and never touches the network', () => {
-    const s = selectProvider({ AI_PROVIDER: 'fake', INKLING_DISABLE_AI: '1' });
+    const s = selectProvider({ AI_PROVIDER: 'fake', TRACEIT_DISABLE_AI: '1' });
     expect(s).toMatchObject({ mode: 'fake' });
     expect(s.provider?.name).toBe('fake');
   });
 
-  it('INKLING_DISABLE_AI=1 turns network providers off', () => {
-    expect(selectProvider({ OPENAI_API_KEY: 'a', INKLING_DISABLE_AI: '1' }).mode).toBe('off');
+  it('TRACEIT_DISABLE_AI=1 turns network providers off', () => {
+    expect(selectProvider({ OPENAI_API_KEY: 'a', TRACEIT_DISABLE_AI: '1' }).mode).toBe('off');
   });
 
   it('DEMO_MODE=1 serves fixtures offline, whatever keys are set', () => {

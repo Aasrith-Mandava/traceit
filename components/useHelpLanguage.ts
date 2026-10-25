@@ -1,20 +1,28 @@
 "use client";
 
 import { useCallback, useSyncExternalStore } from "react";
-import { DEFAULT_LANGUAGE, LANGUAGE_STORAGE_KEY, parseLanguage, type LanguageCode } from "@/lib/ai/languages";
+import {
+  DEFAULT_LANGUAGE,
+  LANGUAGE_STORAGE_KEY,
+  LEGACY_LANGUAGE_STORAGE_KEY,
+  parseLanguage,
+  type LanguageCode,
+} from "@/lib/ai/languages";
 
 // The student's language for help cards, Read aloud and the session recap: remembered on this
 // device (localStorage), shared by every component on the page, and English on the server render
 // (the stored choice takes over right after hydration, so markup never mismatches).
 
-const CHANGE = "inkling:help-language";
+const CHANGE = "traceit:help-language";
 /** Holds the choice when storage is unavailable (private mode, blocked site data). */
 let memory: LanguageCode | null = null;
 
 function read(): LanguageCode {
   let stored: LanguageCode | null = null;
   try {
-    stored = parseLanguage(window.localStorage.getItem(LANGUAGE_STORAGE_KEY));
+    stored =
+      parseLanguage(window.localStorage.getItem(LANGUAGE_STORAGE_KEY)) ??
+      parseLanguage(window.localStorage.getItem(LEGACY_LANGUAGE_STORAGE_KEY));
   } catch {
     // storage blocked: fall back to this page's memory
   }

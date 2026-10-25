@@ -67,7 +67,7 @@ export const PauseIcon = (p: IconProps) => (
   </Svg>
 );
 
-/** A dashed stroke — Inkling's "ghost ink" glyph. */
+/** A dashed stroke — TraceIt's "ghost ink" glyph. */
 export const GhostInkIcon = (p: IconProps) => (
   <Svg {...p}>
     <path d="M3.5 16c3-6 5.5-8 8-5s5 1 9-5" strokeDasharray="3.2 3" />
@@ -110,35 +110,32 @@ export const ArrowRightIcon = (p: IconProps) => (
   </Svg>
 );
 
-/** Inkling mark: an ink drop resting on a dashed teal "ghost" rule. */
-export function InklingMark({ size = 28, className = "" }: { size?: number; className?: string }) {
+/** TraceIt mark: a pen trace (its start faded to dotted ghost ink) ending at a lime spot — the moment it caught. */
+export function TraceItMark({ size = 28, className = "" }: { size?: number; className?: string }) {
   return (
     <svg width={size} height={size} viewBox="0 0 32 32" aria-hidden="true" focusable="false" className={className}>
+      <rect x="1" y="1" width="30" height="30" rx="9" fill="var(--color-accent)" />
       <path
-        d="M16 2.5c-1.2 3.6-8 9.6-8 15a8 8 0 0 0 16 0c0-5.4-6.8-11.4-8-15Z"
-        fill="var(--color-ink)"
-      />
-      <path
-        d="M12.4 18.2a3.8 3.8 0 0 0 3 3.9"
+        d="M6.6 23.4c1.7-.5 3-1.6 4-3.1"
         fill="none"
-        stroke="var(--color-paper)"
-        strokeWidth="1.7"
+        stroke="var(--color-accent-line)"
+        strokeWidth="2.4"
         strokeLinecap="round"
-        opacity=".75"
+        strokeDasharray=".1 3.4"
       />
       <path
-        d="M3 29.5h26"
+        d="M11.4 19.6c1.5-2.8 2.4-6.6 5-6.6 2.6 0 2 5.9 4.7 5.9 1.4 0 2.3-1.4 2.9-3"
         fill="none"
-        stroke="var(--color-ghost)"
-        strokeWidth="2"
+        stroke="#fff"
+        strokeWidth="2.6"
         strokeLinecap="round"
-        strokeDasharray="3 3"
+        strokeLinejoin="round"
       />
+      <circle cx="24.4" cy="11.6" r="3.2" fill="var(--color-highlight)" />
     </svg>
   );
 }
 
-/** Lines of text — the transcript toggle. */
 export const TranscriptIcon = (p: IconProps) => (
   <Svg {...p}>
     <path d="M4 6.5h16M4 11.5h16M4 16.5h10" />
@@ -148,6 +145,13 @@ export const TranscriptIcon = (p: IconProps) => (
 export const UploadIcon = (p: IconProps) => (
   <Svg {...p}>
     <path d="M12 15.5V4.5M7.5 9 12 4.5 16.5 9" />
+    <path d="M4.5 15v2.5a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V15" />
+  </Svg>
+);
+
+export const DownloadIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M12 4.5v11M7.5 11l4.5 4.5 4.5-4.5" />
     <path d="M4.5 15v2.5a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V15" />
   </Svg>
 );
@@ -222,5 +226,32 @@ export const SpeakerIcon = (p: IconProps) => (
 export const SparkleIcon = (p: IconProps) => (
   <Svg {...p}>
     <path d="M12 3.5 13.8 9a1.5 1.5 0 0 0 1 1l5.7 2-5.7 2a1.5 1.5 0 0 0-1 1L12 20.5 10.2 15a1.5 1.5 0 0 0-1-1L3.5 12l5.7-2a1.5 1.5 0 0 0 1-1Z" />
+  </Svg>
+);
+
+// Sidebar navigation icons (the desk shell).
+export const HomeIcon = (p: IconProps) => (
+  <Svg strokeWidth={2} {...p}>
+    <path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z" />
+  </Svg>
+);
+
+export const GrowthIcon = (p: IconProps) => (
+  <Svg strokeWidth={2} {...p}>
+    <path d="M4 20V10M10 20V4M16 20v-7M22 20H2" />
+  </Svg>
+);
+
+export const ClassIcon = (p: IconProps) => (
+  <Svg strokeWidth={2} {...p}>
+    <circle cx="9" cy="8" r="3.5" />
+    <path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 7M18 14.5a6.5 6.5 0 0 1 3.5 5.5" />
+  </Svg>
+);
+
+export const InfoIcon = (p: IconProps) => (
+  <Svg strokeWidth={2} {...p}>
+    <circle cx="12" cy="12" r="9" />
+    <path d="M12 11v6M12 7.5v.01" />
   </Svg>
 );

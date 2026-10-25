@@ -9,8 +9,8 @@ import { scoreSession } from '../scoring';
 import type { EraseEvent, Stroke, TranscriptWord } from '../types';
 
 // Throwaway SQLite file, set before lib/db is first imported.
-const dir = mkdtempSync(join(tmpdir(), 'inkling-lecture-'));
-process.env.INKLING_DB_PATH = join(dir, 'test.db');
+const dir = mkdtempSync(join(tmpdir(), 'traceit-lecture-'));
+process.env.TRACEIT_DB_PATH = join(dir, 'test.db');
 
 type Db = ReturnType<typeof import('../db')['getDb']>;
 let db: Db;

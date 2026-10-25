@@ -55,7 +55,7 @@ test("seeded session: corrected + gap markers, detail panel with before/after an
   await expect(gaps).toHaveCount(1);
   await expect(corrected.first()).toHaveAttribute("data-status", "resolved");
   await expect(gaps.first()).toHaveAttribute("data-status", "open");
-  await expect(corrected.first()).toHaveAccessibleName(/Corrected misconception at 02:30/);
+  await expect(corrected.first()).toHaveAccessibleName(/Fixed at 02:30, resolved/);
 
   // Summary chips match the markers.
   await expect(page.getByTestId("count-corrected")).toHaveText(String(await corrected.count()));
@@ -71,16 +71,21 @@ test("seeded session: corrected + gap markers, detail panel with before/after an
   expect(cBox.width).toBeGreaterThanOrEqual(44);
   expect(cBox.height).toBeGreaterThanOrEqual(44);
 
-  // Corrected moment → detail with before/after crops of the revision.
-  await expect(page.getByTestId("moment-detail")).toHaveCount(0);
-  await corrected.first().click();
+  // Study mode opens the most important moment by itself — the open gap — without taking focus.
   const detail = page.getByTestId("moment-detail");
+  await expect(detail).toHaveAttribute("data-type", "unresolved_gap");
+  await expect(gaps.first()).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByTestId("moment-position")).toHaveText("Moment 1 of 2");
+  expect(await page.evaluate(() => !!document.activeElement?.closest('aside[aria-label="Moment details"]'))).toBe(false);
+
+  // Corrected moment → detail with before/after crops of the revision.
+  await corrected.first().click();
   await expect(detail).toBeVisible();
   await expect(detail).toHaveAttribute("data-type", "misconception_corrected");
   await expect(corrected.first()).toHaveAttribute("aria-pressed", "true");
-  await expect(detail.getByRole("heading", { name: "Corrected misconception" })).toBeVisible();
+  await expect(detail.getByRole("heading", { name: "You caught your own mistake" })).toBeVisible();
   await expect(page.getByTestId("moment-time")).toHaveText("02:30");
-  await expect(page.getByTestId("moment-status")).toHaveText("Resolved");
+  await expect(page.getByTestId("moment-status")).toHaveText("Cleared");
   await expect(page.getByTestId("moment-reasons")).toContainText(/rewrote it 3s later/);
   await expect(page.getByTestId("moment-excerpt")).toContainText(/\w+ \w+ \w+/);
   // Phase 5 replaced the placeholder; this project runs without AI, so the quiet "needs a key" card shows.
@@ -94,7 +99,7 @@ test("seeded session: corrected + gap markers, detail panel with before/after an
   await gaps.first().click();
   await expect(detail).toHaveAttribute("data-type", "unresolved_gap");
   await expect(page.getByTestId("moment-time")).toHaveText("03:40");
-  await expect(page.getByTestId("moment-status")).toHaveText("Open");
+  await expect(page.getByTestId("moment-status")).toHaveText("Still fuzzy");
   const reasons = page.getByTestId("moment-reasons");
   await expect(reasons).toContainText(/paused \d+s while \d+ words were spoken/i);
   await expect(reasons).toContainText(/erased 1×/i);
@@ -126,6 +131,10 @@ test("keyboard: opening a moment moves focus into its panel; Escape returns it t
   await expect(page.getByTestId("timeline")).toHaveAttribute("data-status", "ready");
   const cMarker = markers(page, "misconception_corrected").first();
   const gMarker = markers(page, "unresolved_gap").first();
+
+  // The open gap opens by itself on arrival; focus stays where it was (not in the panel).
+  await expect(page.getByTestId("moment-detail")).toHaveAttribute("data-event-id", gap.id);
+  expect(await focusInPanel()).toEqual({ inPanel: false, testId: null, eventId: null });
 
   // Keyboard-activate a marker: focus lands on the panel's heading.
   await cMarker.focus();
@@ -219,13 +228,16 @@ test("draw → erase part → rewrite over it → End session shows a corrected 
   await expect(corrected).toHaveCount(1);
   await expect(page.getByTestId("count-corrected")).toHaveText("1");
 
-  await corrected.first().click();
-  await expect(page.getByTestId("moment-detail")).toBeVisible();
+  // Its only moment opens by itself (a click on its pressed marker would close it).
+  await expect(page.getByTestId("moment-detail")).toHaveAttribute("data-type", "misconception_corrected");
+  await expect(corrected.first()).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByTestId("moment-position")).toHaveText("Moment 1 of 1");
   await expect.poll(() => paintedPixels(page, "before-canvas")).toBeGreaterThan(40);
   await expect.poll(() => paintedPixels(page, "after-canvas")).toBeGreaterThan(40);
 });
 
 test("a calm session shows the empty state (analysed on open)", async ({ page, request }) => {
+  // Six words in the first 15 s: far less writing than the 2-minute baseline needs.
   const sessionId = await seedSession(request, "Calm notes", (id) => buildSteadyScenario(id));
   const before = await (await request.get(`/api/sessions/${sessionId}/timeline`)).json();
   expect(before.analyzed).toBe(false);
@@ -234,6 +246,11 @@ test("a calm session shows the empty state (analysed on open)", async ({ page, r
   await page.goto(`/review/${sessionId}`);
   await expect(page.getByTestId("timeline")).toHaveAttribute("data-status", "ready");
   await expect(page.getByTestId("timeline-empty")).toBeVisible();
+  await expect(page.getByTestId("timeline-empty")).toHaveText(
+    "Not enough writing to spot anything yet — write along for a few minutes while the lecture plays, then finish again.",
+  );
+  await expect(page.getByTestId("timeline-hint")).toHaveCount(0);
+  await expect(page.getByTestId("moment-detail")).toHaveCount(0);
   await expect(markers(page)).toHaveCount(0);
   await expect(page.getByTestId("count-corrected")).toHaveText("0");
   await expect(page.getByTestId("count-gaps")).toHaveText("0");
@@ -241,6 +258,13 @@ test("a calm session shows the empty state (analysed on open)", async ({ page, r
 
   const after = await (await request.get(`/api/sessions/${sessionId}/timeline`)).json();
   expect(after).toMatchObject({ analyzed: true, stale: false, events: [] });
+
+  // Steady writing for over three minutes: the baseline filled and nothing stood out.
+  const longId = await seedSession(request, "Long calm notes", (id) => buildSteadyScenario(id, 80));
+  expect((await analyze(request, longId)).events).toEqual([]);
+  await page.goto(`/review/${longId}`);
+  await expect(page.getByTestId("timeline")).toHaveAttribute("data-status", "ready");
+  await expect(page.getByTestId("timeline-empty")).toHaveText("Nothing flagged — your notes flowed steadily all the way through.");
 });
 
 test.describe("analysis API", () => {

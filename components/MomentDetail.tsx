@@ -1,7 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react";
-import Link from "next/link";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
 import type {
   BBox,
   ConfusionWindow,
@@ -20,16 +19,23 @@ import { wordIndexAt, wordRange } from "@/lib/transcript";
 import { formatClock } from "./LecturePlayer";
 import { CROP_PAD, paintCrop } from "./cropImage";
 import HelpPanel from "./HelpPanel";
-import { ArrowRightIcon, CheckIcon, CloseIcon, CompareIcon, ReplayIcon, StopIcon } from "./icons";
+import { CheckIcon, PlayIcon, StopIcon } from "./icons";
 import RevisionReading from "./RevisionReading";
 import { useReplay } from "./useReplay";
 import { MomentGlyph } from "./Timeline";
-import { btnPrimary, btnSecondary, iconBtn } from "./ui";
+import { btnPrimary, btnSecondary } from "./ui";
 
-const TITLE_CLASS: Record<TimelineEventType, string> = {
-  misconception_corrected: "text-corrected-strong",
-  unresolved_gap: "text-gap-strong",
-  breakthrough: "text-breakthrough-strong",
+/** The panel's headline, in the student's words (the glyph tile beside it carries the moment's colour). */
+const HEADLINE: Record<TimelineEventType, string> = {
+  misconception_corrected: "You caught your own mistake",
+  unresolved_gap: "This part is still fuzzy",
+  breakthrough: "Aha — this one clicked",
+};
+// Literal class names per type so Tailwind generates them.
+const TILE_CLASS: Record<TimelineEventType, string> = {
+  misconception_corrected: "bg-corrected-soft",
+  unresolved_gap: "bg-gap-soft",
+  breakthrough: "bg-breakthrough-soft",
 };
 
 const intersects = (a: BBox, b: BBox) => a[0] <= b[2] && b[0] <= a[2] && a[1] <= b[3] && b[1] <= a[3];
@@ -77,13 +83,15 @@ function StrokeCrop({
   return <canvas ref={ref} data-testid={testId} className="block aspect-[3/2] w-full" />;
 }
 
+/** Uppercase micro heading inside the panel: "WHAT TIPPED US OFF". */
 function SectionLabel({ children }: { children: React.ReactNode }) {
-  return <h3 className="text-xs font-bold tracking-wide text-ink-muted uppercase">{children}</h3>;
+  return <h3 className="text-xs font-extrabold tracking-[0.1em] text-ink-subtle uppercase">{children}</h3>;
 }
 
 /**
- * "What the lecture was saying": the excerpt as word spans (so a replay can mark the word being
- * spoken) plus the Replay 20s control. Words inside the replayed range are full strength.
+ * "What the lecture said": the excerpt as word spans on a dark card (so a replay can mark the
+ * word being spoken in lime) plus the "Play this part" control. Words inside the replayed range are
+ * full strength.
  */
 function Evidence({
   event,
@@ -140,14 +148,14 @@ function Evidence({
       <blockquote
         ref={excerptRef}
         data-testid="moment-excerpt"
-        className="border-l-2 border-line-strong pl-3 text-sm leading-relaxed text-pretty text-ink-muted"
+        className="text-[15px] leading-relaxed text-pretty text-white/90"
       >
         “…
         {slice.map((w, i) => {
           const inRange = w.endMs >= audioStartMs && w.startMs <= audioEndMs;
           return (
             <span key={i}>
-              <span data-w={i} className={`excerpt-word ${inRange ? "" : "opacity-60"}`}>
+              <span data-w={i} className={`excerpt-word ${inRange ? "" : "opacity-65"}`}>
                 {w.w}
               </span>
               {i < slice.length - 1 ? " " : ""}
@@ -159,68 +167,67 @@ function Evidence({
     );
   } else if (words.length === 0 && transcriptSource === "none") {
     body = (
-      <p data-testid="moment-excerpt" className="text-sm text-ink-subtle">
+      <p data-testid="moment-excerpt" className="text-[15px] text-night-text">
         No transcript for this lecture
       </p>
     );
   } else if (excerpt) {
     body = (
-      <blockquote
-        data-testid="moment-excerpt"
-        className="border-l-2 border-line-strong pl-3 text-sm leading-relaxed text-pretty text-ink-muted"
-      >
+      <blockquote data-testid="moment-excerpt" className="text-[15px] leading-relaxed text-pretty text-white/90">
         “…{excerpt}…”
       </blockquote>
     );
   } else {
     body = (
-      <p data-testid="moment-excerpt" className="text-sm text-ink-subtle">
-        No transcript for this part of the lecture.
+      <p data-testid="moment-excerpt" className="text-[15px] text-night-text">
+        Nothing was transcribed for this part of the lecture.
       </p>
     );
   }
 
+  const label = playing ? "Stop" : replayState === "done" ? "Play again" : "Play this part";
+
   return (
-    <div className="flex flex-col gap-2.5">
+    <div className="flex flex-col gap-2">
       <div className="flex items-baseline justify-between gap-2">
-        <SectionLabel>What the lecture was saying</SectionLabel>
+        <SectionLabel>What the lecture said</SectionLabel>
         <span className="font-mono text-xs tabular-nums text-ink-subtle">
           {formatClock(audioStartMs)}–{formatClock(audioEndMs)}
         </span>
       </div>
-      {body}
-      <div className="flex items-center gap-3">
-        <button
-          type="button"
-          data-testid="replay"
-          data-replay-state={replayState}
-          aria-label={playing ? "Stop replay" : `Replay ${formatClock(audioStartMs)} to ${formatClock(audioEndMs)}`}
-          onClick={() => {
-            clear();
-            if (playing) stopReplay();
-            else void startReplay();
-          }}
-          className={`press inline-flex min-h-11 shrink-0 items-center gap-2 rounded-pill border px-4 text-sm font-semibold ${
-            playing
-              ? "border-accent bg-accent text-on-accent hover:bg-accent-hover"
-              : "border-line-strong bg-chrome text-ink hover:bg-chrome-hover"
-          }`}
-        >
-          {playing ? <StopIcon size={14} /> : <ReplayIcon size={16} />}
-          {playing ? "Stop" : replayState === "done" ? "Replay again" : `Replay ${Math.round((audioEndMs - audioStartMs) / 1000)}s`}
-        </button>
-        <div
-          aria-hidden="true"
-          data-testid="replay-progress"
-          className="relative h-1 min-w-0 flex-1 overflow-hidden rounded-pill bg-line"
-        >
-          <div
-            ref={barRef}
-            className={`absolute inset-0 origin-left rounded-pill transition-colors ${
-              replayState === "done" ? "bg-ok" : "bg-accent"
+      <div className="flex flex-col gap-3 rounded-[14px] bg-night px-4 py-3.5">
+        {body}
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            data-testid="replay"
+            data-replay-state={replayState}
+            aria-label={playing ? "Stop replay" : `${label}, ${formatClock(audioStartMs)} to ${formatClock(audioEndMs)}`}
+            onClick={() => {
+              clear();
+              if (playing) stopReplay();
+              else void startReplay();
+            }}
+            className={`press inline-flex min-h-11 shrink-0 items-center gap-2 rounded-pill px-4 text-sm font-bold text-ink ${
+              playing ? "bg-chrome hover:bg-chrome-press" : "bg-highlight hover:bg-highlight-strong"
             }`}
-            style={{ transform: "scaleX(0)" }}
-          />
+          >
+            {playing ? <StopIcon size={14} /> : <PlayIcon size={14} />}
+            {label}
+          </button>
+          <div
+            aria-hidden="true"
+            data-testid="replay-progress"
+            className="relative h-1 min-w-0 flex-1 overflow-hidden rounded-pill bg-night-line"
+          >
+            <div
+              ref={barRef}
+              className={`absolute inset-0 origin-left rounded-pill transition-colors ${
+                replayState === "done" ? "bg-corrected" : "bg-highlight"
+              }`}
+              style={{ transform: "scaleX(0)" }}
+            />
+          </div>
         </div>
       </div>
       {replayState === "error" ? (
@@ -244,7 +251,13 @@ interface MomentDetailProps {
   /** Strokes that exist on the page (activeStrokes), for context around a revision. */
   pageStrokes: Stroke[];
   strokesById: Map<string, Stroke>;
-  onClose: () => void;
+  /**
+   * Move focus to the moment's heading when it opens (the student opened it). False when Study mode
+   * opened it by itself on arrival: focus stays where it was.
+   */
+  autoFocus?: boolean;
+  /** Shown at the bottom of the moment, after the help card (the guided review's "Next moment"). */
+  footer?: ReactNode;
   /** "I get it now" / "Still confused" on a gap; resolves once the change is stored. */
   onSelfAction?: (action: SelfAction) => Promise<void>;
   /** Which AI provider (if any) can explain moments (Phase 5). */
@@ -279,7 +292,7 @@ function GapProgress({ event, onSelfAction }: { event: TimelineEvent; onSelfActi
   };
 
   return (
-    <div className="flex flex-col gap-2.5 rounded-md border border-line bg-desk/60 px-3 py-3">
+    <div className="flex flex-col gap-2.5 rounded-[14px] bg-chrome-hover px-3.5 py-3">
       {line ? (
         <p data-testid="moment-history" className="text-sm text-pretty text-ink-muted" suppressHydrationWarning>
           {line}
@@ -311,8 +324,8 @@ function GapProgress({ event, onSelfAction }: { event: TimelineEvent; onSelfActi
               {pending === "reopen" ? "Saving…" : "Still confused"}
             </button>
           )}
-          <span className="text-xs text-pretty text-ink-subtle">
-            {open ? "Or write through this part calmly next time — it’ll resolve itself." : "Reopen it if it still feels shaky."}
+          <span className="text-[13px] text-pretty text-ink-subtle">
+            {open ? "Or just write through it calmly next time — it’ll clear up on its own." : "Feels shaky again? Reopen it."}
           </span>
         </div>
       ) : null}
@@ -334,7 +347,8 @@ export default function MomentDetail({
   revision,
   pageStrokes,
   strokesById,
-  onClose,
+  autoFocus = true,
+  footer,
   onSelfAction,
   ai,
   onEventsChange,
@@ -342,13 +356,13 @@ export default function MomentDetail({
 }: MomentDetailProps) {
   const meta = MOMENT_META[event.type];
   const titleRef = useRef<HTMLHeadingElement>(null);
-  // Opening a moment (a marker, ?moment=, or switching markers: the panel is keyed by the moment)
-  // moves focus to its heading so keyboard and screen-reader users land in the panel. The panel
-  // scrolls on its own on wide screens and sits right under the timeline on narrow ones, so the
-  // page is not scrolled for it. Closing returns focus to the marker (ReviewView).
+  // Opening a moment (a marker, ?moment=, Previous / Next, or switching markers: the panel is keyed
+  // by the moment) moves focus to its heading so keyboard and screen-reader users land in the panel.
+  // The panel scrolls on its own on wide screens and sits right under the timeline on narrow ones,
+  // so the page is not scrolled for it. Closing returns focus to the marker (ReviewView).
   useEffect(() => {
-    titleRef.current?.focus({ preventScroll: true });
-  }, []);
+    if (autoFocus) titleRef.current?.focus({ preventScroll: true });
+  }, [autoFocus]);
   const reasons = useMemo(
     () => reasonsFor(event, windows, revision, strokesById),
     [event, windows, revision, strokesById],
@@ -379,59 +393,58 @@ export default function MomentDetail({
       aria-labelledby="moment-title"
       className="enter-soft flex flex-col gap-5"
     >
-      <header className="flex items-start gap-2">
-        <div className="flex min-w-0 flex-1 flex-col gap-1.5 pt-1">
+      <header className="flex items-start gap-3">
+        <span aria-hidden="true" className={`inline-flex size-10 shrink-0 items-center justify-center rounded-[12px] ${TILE_CLASS[event.type]}`}>
+          <MomentGlyph type={event.type} size={16} />
+        </span>
+        <div className="flex min-w-0 flex-1 flex-col gap-1">
           <h2
             id="moment-title"
             ref={titleRef}
             tabIndex={-1}
             data-testid="moment-title"
-            className={`-mx-1.5 flex items-center gap-2 rounded-sm px-1.5 py-0.5 text-[17px] leading-tight font-bold tracking-tight text-balance outline-none focus-visible:shadow-[var(--focus-ring)] ${TITLE_CLASS[event.type]}`}
+            title={meta.label}
+            className="-mx-1 rounded-sm px-1 font-display text-[21px] leading-[1.15] font-bold text-balance text-ink outline-none focus-visible:shadow-[var(--focus-ring)]"
           >
-            <MomentGlyph type={event.type} size={14} className="shrink-0" />
-            {meta.label}
+            {event.type === "unresolved_gap" && event.status !== "open" ? "This part was fuzzy" : HEADLINE[event.type]}
           </h2>
-          <p className="flex flex-wrap items-center gap-2 text-sm text-ink-muted">
-            <span className="font-mono tabular-nums text-ink" data-testid="moment-time">
+          <p className="flex flex-wrap items-center gap-2 text-[13px]">
+            <span className="font-mono tabular-nums text-ink-muted" data-testid="moment-time">
               {formatClock(event.lectureMs)}
             </span>
-            <span aria-hidden="true" className="text-line-strong">
-              ·
-            </span>
             {event.status === "open" ? (
-              <span data-testid="moment-status" className="inline-flex items-center rounded-pill bg-gap-soft px-2 py-0.5 text-xs font-semibold text-gap-strong">
-                Open
+              <span
+                data-testid="moment-status"
+                className="inline-flex items-center rounded-pill bg-gap-soft px-2.5 py-0.5 font-bold text-gap-strong"
+              >
+                Still fuzzy
               </span>
             ) : (
               <span
                 data-testid="moment-status"
-                className="inline-flex items-center gap-1 rounded-pill bg-ok-soft px-2 py-0.5 text-xs font-semibold text-ok-strong"
+                className="inline-flex items-center gap-1 rounded-pill bg-ok-soft px-2.5 py-0.5 font-bold text-ok-strong"
               >
-                <CheckIcon size={12} />
-                Resolved
+                <CheckIcon size={12} strokeWidth={3} />
+                Cleared
               </span>
             )}
           </p>
         </div>
-        <button type="button" onClick={onClose} aria-label="Close moment details" className={`${iconBtn} -mt-1 -mr-2`}>
-          <CloseIcon size={18} />
-        </button>
       </header>
 
       {event.conceptLabel ? (
-        <p data-testid="moment-concept" className="-mt-2 text-sm text-pretty text-ink">
-          <span className="text-ink-subtle">About </span>“{event.conceptLabel}”
+        <p data-testid="moment-concept" className="-mt-2 text-[15px] text-pretty text-ink-muted">
+          Topic: <b className="font-bold text-ink">{event.conceptLabel}</b>
         </p>
       ) : null}
 
       {event.type === "unresolved_gap" ? <GapProgress event={event} onSelfAction={onSelfAction} /> : null}
 
       <div className="flex flex-col gap-2">
-        <SectionLabel>Why it was flagged</SectionLabel>
-        <ul data-testid="moment-reasons" className="flex flex-col gap-1.5 text-sm text-ink">
+        <SectionLabel>Why we flagged this</SectionLabel>
+        <ul data-testid="moment-reasons" className="list-disc pl-[18px] text-[15px] leading-relaxed text-ink marker:text-ink-subtle">
           {reasons.map((r) => (
-            <li key={r} className="flex gap-2 text-pretty">
-              <span aria-hidden="true" className="mt-2 size-1 shrink-0 rounded-pill bg-ink-subtle" />
+            <li key={r} className="text-pretty">
               {r}
             </li>
           ))}
@@ -439,26 +452,25 @@ export default function MomentDetail({
       </div>
 
       {crop && revision ? (
-        <div className="flex flex-col gap-2">
-          <SectionLabel>What changed on the page</SectionLabel>
-          <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
-            <figure className="flex flex-col gap-1">
-              <div className="paper overflow-hidden rounded-md border border-line" style={{ "--rule-gap": "12px" } as React.CSSProperties}>
+        <div className="flex flex-col gap-2.5">
+          <SectionLabel>First try vs. second try</SectionLabel>
+          <div className="grid grid-cols-2 gap-2.5">
+            <figure className="flex flex-col gap-1.5">
+              <div className="paper-plain overflow-hidden rounded-[12px] border border-line bg-paper" style={{ "--rule-gap": "13px" } as React.CSSProperties}>
                 <StrokeCrop focus={crop.before} context={crop.context} bbox={revision.bbox} ghost testId="before-canvas" />
               </div>
-              <figcaption className="flex items-center gap-1.5 text-xs text-ink-muted">
+              <figcaption className="flex items-center gap-1.5 text-xs font-bold text-accent">
                 <span aria-hidden="true" className="inline-block w-3 border-t-2 border-dashed border-ghost" />
-                Before · erased
+                Rubbed out
               </figcaption>
             </figure>
-            <ArrowRightIcon size={16} className="mb-5 text-ink-subtle" />
-            <figure className="flex flex-col gap-1">
-              <div className="paper overflow-hidden rounded-md border border-line" style={{ "--rule-gap": "12px" } as React.CSSProperties}>
+            <figure className="flex flex-col gap-1.5">
+              <div className="paper-plain overflow-hidden rounded-[12px] border border-line bg-paper" style={{ "--rule-gap": "13px" } as React.CSSProperties}>
                 <StrokeCrop focus={crop.after} context={crop.context} bbox={revision.bbox} ghost={false} testId="after-canvas" />
               </div>
-              <figcaption className="flex items-center gap-1.5 text-xs text-ink-muted">
+              <figcaption className="flex items-center gap-1.5 text-xs font-bold text-ink">
                 <span aria-hidden="true" className="inline-block w-3 border-t-2 border-ink" />
-                After · rewritten
+                What you wrote instead
               </figcaption>
             </figure>
           </div>
@@ -477,17 +489,7 @@ export default function MomentDetail({
 
       <HelpPanel event={event} ai={ai} onEventsChange={onEventsChange} />
 
-      <footer className="-mt-1 border-t border-line pt-3">
-        <Link
-          href={`/compare/${encodeURIComponent(event.sessionId)}`}
-          data-testid="moment-compare-link"
-          className="press -mx-2 inline-flex min-h-11 items-center gap-2 rounded-pill px-2 text-sm font-semibold text-accent hover:bg-accent-soft"
-        >
-          <CompareIcon size={16} />
-          See what your Notability page hides
-          <ArrowRightIcon size={14} />
-        </Link>
-      </footer>
+      {footer ? <footer className="border-t border-line pt-4">{footer}</footer> : null}
     </section>
   );
 }

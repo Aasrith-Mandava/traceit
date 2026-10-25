@@ -1,4 +1,6 @@
 import { MAX_STATS_WINDOW_MS, MIN_STATS_WINDOW_MS, getDb } from "@/lib/db";
+import { notFoundJson, ownedSession } from "@/lib/access";
+import { withUser } from "@/lib/auth/core";
 import { sameOriginOnly } from "@/lib/http";
 
 const DEFAULT_WINDOW_MS = 10_000;
@@ -8,7 +10,7 @@ const DEFAULT_WINDOW_MS = 10_000;
  * median speed and mean pen pressure per lecture-time window. On Tiger Data this is a TimescaleDB
  * time_bucket query over the ink_samples hypertable.
  */
-export const GET = sameOriginOnly(async (request: Request, ctx: RouteContext<"/api/sessions/[id]/ink-stats">) => {
+export const GET = sameOriginOnly(withUser(async (request, user, ctx: RouteContext<"/api/sessions/[id]/ink-stats">) => {
   const { id } = await ctx.params;
   const param = new URL(request.url).searchParams.get("windowMs");
   const windowMs = param === null ? DEFAULT_WINDOW_MS : Number(param);
@@ -19,6 +21,6 @@ export const GET = sameOriginOnly(async (request: Request, ctx: RouteContext<"/a
     );
   }
   const db = getDb();
-  if (!(await db.getSession(id))) return Response.json({ error: "session not found" }, { status: 404 });
+  if (!(await ownedSession(user, id))) return notFoundJson("session");
   return Response.json({ sessionId: id, windowMs, windows: await db.inkWindowStats(id, windowMs) });
-});
+}));

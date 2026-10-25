@@ -6,7 +6,7 @@ import type { NotabilityImport, TimelineData } from "../lib/types";
 import { buildPhase2Scenario } from "./fixtures/phase2-scenario";
 
 // Phase 7: "Notability keeps the final page. Here's what it hides." Upload a Notability PDF export
-// for a session and compare it with the process Inkling kept.
+// for a session and compare it with the process TraceIt kept.
 
 test.use({ viewport: { width: 1180, height: 820 } });
 
@@ -40,14 +40,17 @@ async function uploadPdf(request: APIRequestContext, sessionId: string, file: { 
   return request.post(`/api/sessions/${sessionId}/notability`, { multipart: { file }, headers });
 }
 
-/** POSTs a tiny multipart body that declares a much larger Content-Length; resolves with the reply. */
-function declaredLengthPost(url: string, declared: number): Promise<{ status: number; body: string }> {
+/**
+ * POSTs a tiny multipart body that declares a much larger Content-Length; resolves with the reply.
+ * `cookie`: the signed-in student's Cookie header (this bypasses Playwright's request context).
+ */
+function declaredLengthPost(url: string, declared: number, cookie: string): Promise<{ status: number; body: string }> {
   return new Promise((resolve, reject) => {
     const req = httpRequest(
       url,
       {
         method: "POST",
-        headers: { "Content-Type": "multipart/form-data; boundary=x", "Content-Length": String(declared) },
+        headers: { "Content-Type": "multipart/form-data; boundary=x", "Content-Length": String(declared), Cookie: cookie },
       },
       (res) => {
         let body = "";
@@ -74,23 +77,28 @@ async function inkedPixels(page: Page, testId: string) {
   });
 }
 
-/** Pixels in the teal ghost ink (#0d9488, drawn at 50 % over transparent). */
+/** Pixels in the light-indigo ghost ink (#8b80f9, drawn at 50 % over transparent; never the moment outlines). */
 async function ghostPixels(page: Page) {
   return page.getByTestId("process-canvas").evaluate((el) => {
     const c = el as HTMLCanvasElement;
     const d = c.getContext("2d")!.getImageData(0, 0, c.width, c.height).data;
     let n = 0;
-    for (let i = 0; i < d.length; i += 4) if (d[i + 3] > 30 && d[i] < 100 && d[i + 1] > 110 && d[i + 2] < d[i + 1] + 8 && d[i + 1] - d[i] > 60) n++;
+    for (let i = 0; i < d.length; i += 4) if (d[i + 3] > 30 && d[i] > 90 && d[i + 2] > 200 && d[i + 2] - d[i] > 70 && d[i + 2] - d[i + 1] > 80) n++;
     return n;
   });
 }
 
-test("review → Compare → empty state → upload a PDF → it renders, with page navigation", async ({ page, request }) => {
+test("Compare (a demo page, by URL) → empty state → upload a PDF → it renders, with page navigation", async ({ page, request }) => {
   const sessionId = await seedSession(request, "Chain rule — compare");
   await page.goto(`/review/${sessionId}`);
   await expect(page.getByTestId("timeline")).toHaveAttribute("data-status", "ready");
-  await page.getByTestId("compare-link").click();
-  await page.waitForURL(new RegExp(`/compare/${sessionId}$`));
+  // Study mode offers the PDF download instead; nothing in it links to the compare page any more.
+  await expect(page.getByTestId("download-pdf")).toHaveAttribute("href", `/api/sessions/${sessionId}/export`);
+  await expect(page.getByTestId("compare-link")).toHaveCount(0);
+  await expect(page.locator('a[href^="/compare"]')).toHaveCount(0);
+  await page.goto(`/compare/${sessionId}`);
+  // Kept out of search engines.
+  await expect(page.locator('meta[name="robots"]')).toHaveAttribute("content", "noindex, nofollow");
 
   // Empty state: explanation, export steps, drop zone; overlay needs a PDF first.
   await expect(page.getByRole("heading", { name: "What the final page hides" })).toBeVisible();
@@ -166,7 +174,7 @@ test("the process view shows ghost ink and moment markers; stats match the revie
   await expect(page.getByTestId("hidden-gaps")).toHaveText(review.gaps!);
   await expect(page.getByTestId("hidden-breakthroughs")).toHaveText(review.breakthroughs!);
 
-  const process = page.getByTestId("inkling-process");
+  const process = page.getByTestId("traceit-process");
   await expect(process).toHaveAttribute("data-ghost", "on");
   await expect(process).toHaveAttribute("data-erased-count", "3");
   await expect.poll(() => ghostPixels(page)).toBeGreaterThan(50);
@@ -187,10 +195,10 @@ test("the process view shows ghost ink and moment markers; stats match the revie
   await page.waitForURL(new RegExp(`/review/${sessionId}\\?moment=`));
   await expect(page.getByTestId("moment-detail")).toHaveAttribute("data-event-id", eventId!);
 
-  // The moment panel's footer leads back to the comparison.
-  await page.getByTestId("moment-compare-link").click();
-  await page.waitForURL(new RegExp(`/compare/${sessionId}$`));
-  await expect(page.getByTestId("inkling-process")).toBeVisible();
+  // The moment panel no longer links to the comparison; the page still opens by URL.
+  await expect(page.getByTestId("moment-compare-link")).toHaveCount(0);
+  await page.goto(`/compare/${sessionId}`);
+  await expect(page.getByTestId("traceit-process")).toBeVisible();
 });
 
 test("overlay mode: the divider reveals the process with mouse and keyboard", async ({ page, request }) => {
@@ -271,7 +279,8 @@ test.describe("upload guards", () => {
     await reject(403, await uploadPdf(request, sessionId, { name: "notes.pdf", mimeType: "application/pdf", buffer: await makePdf(1) }, { Origin: "https://evil.example" }));
     // Oversized: refused from the declared Content-Length before the body is read (sent raw, since
     // Playwright's request context recomputes Content-Length).
-    const oversized = await declaredLengthPost(`${baseURL}/api/sessions/${sessionId}/notability`, 60 * 1024 * 1024);
+    const cookie = (await request.storageState()).cookies.map((c) => `${c.name}=${c.value}`).join("; ");
+    const oversized = await declaredLengthPost(`${baseURL}/api/sessions/${sessionId}/notability`, 60 * 1024 * 1024, cookie);
     expect(oversized.status).toBe(413);
     expect(oversized.body).toMatch(/at most 50 MB/);
     await reject(404, await uploadPdf(request, "no-such-session", { name: "notes.pdf", mimeType: "application/pdf", buffer: await makePdf(1) }));
@@ -303,7 +312,7 @@ test.describe("upload guards", () => {
     await expect(error).toHaveAttribute("data-kind", "invalid");
     await expect(error).toHaveText(/damaged or incomplete/);
     // The rest of the page still works, and a good PDF can be uploaded over it.
-    await expect(page.getByTestId("inkling-process")).toBeVisible();
+    await expect(page.getByTestId("traceit-process")).toBeVisible();
     await expect(page.getByTestId("mode-overlay")).toBeDisabled();
     await page.getByTestId("notability-upload").setInputFiles({ name: "fixed.pdf", mimeType: "application/pdf", buffer: await makePdf(1) });
     await expect(page.getByTestId("notability-pdf")).toHaveAttribute("data-rendered", "true");
@@ -318,7 +327,7 @@ test("iPad portrait: both views stay usable", async ({ page, request }) => {
   await page.goto(`/compare/${sessionId}`);
   await expect(page.getByTestId("notability-pdf")).toHaveAttribute("data-rendered", "true");
   const pdf = (await page.getByTestId("notability-pdf").boundingBox())!;
-  const proc = (await page.getByTestId("inkling-process").boundingBox())!;
+  const proc = (await page.getByTestId("traceit-process").boundingBox())!;
   expect(pdf.width).toBeGreaterThan(300);
   expect(proc.width).toBeGreaterThan(300);
   // No horizontal scrolling.

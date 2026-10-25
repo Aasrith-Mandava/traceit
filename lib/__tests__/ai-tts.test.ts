@@ -27,7 +27,7 @@ describe('selectTts', () => {
 
   it('is off (browser voice) in tests, with the fake provider, and in demo mode', () => {
     expect(selectTts({ ELEVENLABS_API_KEY: 'el', AI_PROVIDER: 'fake' }).tts).toBeNull();
-    expect(selectTts({ OPENAI_API_KEY: 'sk', INKLING_DISABLE_AI: '1' }).tts).toBeNull();
+    expect(selectTts({ OPENAI_API_KEY: 'sk', TRACEIT_DISABLE_AI: '1' }).tts).toBeNull();
     expect(selectTts({ OPENAI_API_KEY: 'sk', DEMO_MODE: '1' }).tts).toBeNull();
   });
 

@@ -160,14 +160,14 @@ export function PdfPage({
           data-testid="notability-pdf-canvas"
           role="img"
           aria-label={`Notability export, page ${pageNumber} of ${doc.numPages}`}
-          className={`absolute block rounded-sm bg-white shadow-page outline outline-1 -outline-offset-1 outline-black/10 transition-opacity duration-200 ${
+          className={`absolute block rounded-sm bg-white shadow-page outline outline-1 -outline-offset-1 outline-ink/10 transition-opacity duration-200 ${
             rendered ? "opacity-100" : "opacity-0"
           }`}
         />
       </div>
       {!rendered && !failed ? (
-        <p role="status" className="absolute inset-0 flex items-center justify-center gap-2 text-sm text-ink-muted">
-          <span aria-hidden="true" className="size-1.5 animate-pulse rounded-pill bg-accent" />
+        <p role="status" className="absolute inset-0 flex items-center justify-center gap-2 text-sm font-semibold text-ink-muted">
+          <span aria-hidden="true" className="size-2 animate-pulse rounded-pill bg-accent" />
           Drawing page {pageNumber}…
         </p>
       ) : null}
@@ -184,7 +184,7 @@ export function PdfPage({
 export function PageNav({ page, count, onChange }: { page: number; count: number; onChange: (page: number) => void }) {
   if (count < 2) return null;
   return (
-    <div className="flex items-center gap-0.5" role="group" aria-label="Pages">
+    <div className="flex items-center gap-1" role="group" aria-label="Pages">
       <button
         type="button"
         data-testid="pdf-prev"
@@ -195,7 +195,7 @@ export function PageNav({ page, count, onChange }: { page: number; count: number
       >
         <ChevronLeftIcon size={18} />
       </button>
-      <span data-testid="pdf-page-label" aria-live="polite" className="min-w-[5.5rem] text-center text-sm tabular-nums text-ink-muted">
+      <span data-testid="pdf-page-label" aria-live="polite" className="min-w-[5.5rem] text-center text-sm font-semibold tabular-nums text-ink-muted">
         Page {page} of {count}
       </span>
       <button

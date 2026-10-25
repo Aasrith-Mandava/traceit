@@ -6,8 +6,10 @@ import { mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import demoTranscript from "@/public/demo/lecture.transcript.json";
 import type {
+  ClassInfo,
   EraseEvent,
   HelpCard,
+  Lecture,
   PointerKind,
   RevisionReading,
   Session,
@@ -15,6 +17,7 @@ import type {
   TimelineEvent,
   TranscriptSource,
   TranscriptWord,
+  User,
 } from "./types";
 import { newId } from "./ink";
 import { DEMO_LECTURE, DEMO_MEDIA_PATH } from "./demo";
@@ -23,6 +26,10 @@ import {
   LOCAL_STUDENT_ID,
   SESSION_STROKE_COUNTS_SQL,
   carryForward,
+  normaliseEmail,
+  sessionStrokeCountsSql,
+  toClassInfo,
+  toUser,
   toStrokeCounts,
   computeInkHotspots,
   computeInkWindowStats,
@@ -40,6 +47,7 @@ import {
   type AiCacheRow,
   type AnalysisStateRow,
   type AnalysisToSave,
+  type ClassRow,
   type Db,
   type DbInfo,
   type EraseRow,
@@ -47,9 +55,11 @@ import {
   type LectureMediaPatch,
   type LectureRecord,
   type LectureRow,
+  type NewClass,
   type NewLecture,
   type NewNotabilityImport,
   type NewSession,
+  type NewUser,
   type NotabilityImportRecord,
   type NotabilityRow,
   type PrevEventRow,
@@ -58,6 +68,8 @@ import {
   type StoredAnalysis,
   type StrokeCountRow,
   type StrokeRow,
+  type StudentClass,
+  type UserRow,
   type WindowRow,
 } from "./dbShared";
 import { openPostgresDb } from "./dbPostgres";
@@ -91,7 +103,8 @@ CREATE TABLE IF NOT EXISTS strokes (
   erased_by TEXT,
   is_scribble INTEGER NOT NULL DEFAULT 0,
   split_from TEXT,
-  replaced_by TEXT
+  replaced_by TEXT,
+  size REAL
 );
 CREATE INDEX IF NOT EXISTS strokes_session ON strokes(session_id, start_ms);
 CREATE TABLE IF NOT EXISTS erase_events (
@@ -158,7 +171,15 @@ CREATE TABLE IF NOT EXISTS lectures (
 
 /** Lecture columns without the (potentially large) transcript. */
 const LECTURE_COLS = `id, course_id, title, media_path, media_type, mime, duration_ms, transcript_source, created_at,
-  json_array_length(transcript) AS word_count`;
+  json_array_length(transcript) AS word_count, owner_id, class_id,
+  (SELECT c.name FROM classes c WHERE c.id = lectures.class_id) AS class_name`;
+const USER_COLS = `id, email, name, role, (password_hash IS NULL) AS guest, created_at`;
+const CLASS_SELECT = `SELECT c.id, c.name, c.teacher_id, u.name AS teacher_name, c.join_code, c.created_at
+  FROM classes c JOIN users u ON u.id = c.teacher_id`;
+/** A lecture is visible to user @user: bundled demo, own, taught or enrolled class. */
+const VISIBLE_TO = `(transcript_source = 'demo' OR owner_id = @user
+  OR class_id IN (SELECT id FROM classes WHERE teacher_id = @user)
+  OR class_id IN (SELECT class_id FROM enrollments WHERE student_id = @user))`;
 
 /** Marks the async context of a running SqliteDb.transaction (value: the database it belongs to). */
 const sqliteTx = new AsyncLocalStorage<SqliteDb>();
@@ -205,6 +226,8 @@ class SqliteDb implements Db {
     // Partial erase lineage (a stroke cut into pieces keeps its row; pieces point back to it).
     if (!cols.has("split_from")) this.db.exec(`ALTER TABLE strokes ADD COLUMN split_from TEXT`);
     if (!cols.has("replaced_by")) this.db.exec(`ALTER TABLE strokes ADD COLUMN replaced_by TEXT`);
+    // Pen sizes (NULL = Medium, every stroke drawn before sizes existed).
+    if (!cols.has("size")) this.db.exec(`ALTER TABLE strokes ADD COLUMN size REAL`);
 
     // Phase 2: analysis bookkeeping on sessions (analysis is stale when ink_version > analyzed_version).
     const sessionCols = new Set(
@@ -265,6 +288,52 @@ class SqliteDb implements Db {
       CREATE INDEX IF NOT EXISTS notability_imports_session ON notability_imports(session_id, created_at);
       CREATE UNIQUE INDEX IF NOT EXISTS notability_imports_current ON notability_imports(session_id) WHERE is_current = 1;
     `);
+
+    // Accounts, sign-in sessions (sha256 of the cookie token only) and classes.
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS users (
+        id TEXT PRIMARY KEY,
+        email TEXT NOT NULL UNIQUE,
+        name TEXT NOT NULL,
+        role TEXT NOT NULL CHECK (role IN ('student', 'teacher')),
+        password_hash TEXT,
+        created_at TEXT NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS auth_sessions (
+        token_hash TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        created_at TEXT NOT NULL,
+        expires_at TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS auth_sessions_user ON auth_sessions(user_id);
+      CREATE INDEX IF NOT EXISTS auth_sessions_expires ON auth_sessions(expires_at);
+      CREATE TABLE IF NOT EXISTS classes (
+        id TEXT PRIMARY KEY,
+        teacher_id TEXT NOT NULL REFERENCES users(id),
+        name TEXT NOT NULL,
+        join_code TEXT NOT NULL UNIQUE,
+        created_at TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS classes_teacher ON classes(teacher_id, created_at);
+      CREATE TABLE IF NOT EXISTS enrollments (
+        class_id TEXT NOT NULL REFERENCES classes(id) ON DELETE CASCADE,
+        student_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        created_at TEXT NOT NULL,
+        PRIMARY KEY (class_id, student_id)
+      );
+      CREATE INDEX IF NOT EXISTS enrollments_student ON enrollments(student_id);
+    `);
+    const lectureCols = new Set(
+      (this.db.prepare(`PRAGMA table_info(lectures)`).all() as Array<{ name: string }>).map((c) => c.name),
+    );
+    // NULL owner = the bundled demo lecture or one added before accounts existed.
+    if (!lectureCols.has("owner_id")) this.db.exec(`ALTER TABLE lectures ADD COLUMN owner_id TEXT`);
+    if (!lectureCols.has("class_id")) this.db.exec(`ALTER TABLE lectures ADD COLUMN class_id TEXT REFERENCES classes(id)`);
+    this.db.exec(`
+      CREATE INDEX IF NOT EXISTS lectures_owner ON lectures(owner_id);
+      CREATE INDEX IF NOT EXISTS lectures_class ON lectures(class_id);
+      CREATE INDEX IF NOT EXISTS sessions_lecture_student ON sessions(lecture_id, student_id);
+    `);
   }
 
   /** Last createdAtIso handed out, so sessions created in the same millisecond still order strictly. */
@@ -319,17 +388,23 @@ class SqliteDb implements Db {
     })();
   }
 
-  async sessionStrokeCounts() {
-    return toStrokeCounts(this.db.prepare(SESSION_STROKE_COUNTS_SQL).all() as StrokeCountRow[]);
+  async sessionStrokeCounts(studentId?: string) {
+    const rows =
+      studentId === undefined
+        ? this.db.prepare(SESSION_STROKE_COUNTS_SQL).all()
+        : this.db
+            .prepare(sessionStrokeCountsSql(`WHERE session_id IN (SELECT id FROM sessions WHERE student_id = ?)`))
+            .all(studentId);
+    return toStrokeCounts(rows as StrokeCountRow[]);
   }
 
   async upsertStrokes(sessionId: string, strokes: Stroke[]) {
     if (strokes.length === 0) return;
     const stmt = this.db.prepare(
       `INSERT INTO strokes (id, session_id, start_ms, end_ms, points, pointer_type, bbox, ink_len, median_speed,
-                            erased, erased_at_ms, erased_by, is_scribble, split_from, replaced_by)
+                            erased, erased_at_ms, erased_by, is_scribble, split_from, replaced_by, size)
        VALUES (@id, @session_id, @start_ms, @end_ms, @points, @pointer_type, @bbox, @ink_len, @median_speed,
-               @erased, @erased_at_ms, @erased_by, @is_scribble, @split_from, @replaced_by)
+               @erased, @erased_at_ms, @erased_by, @is_scribble, @split_from, @replaced_by, @size)
        ON CONFLICT(id) DO UPDATE SET
          start_ms = excluded.start_ms, end_ms = excluded.end_ms, points = excluded.points,
          pointer_type = excluded.pointer_type, bbox = excluded.bbox, ink_len = excluded.ink_len,
@@ -337,7 +412,8 @@ class SqliteDb implements Db {
          erased_by = excluded.erased_by, is_scribble = excluded.is_scribble,
          -- Lineage is sticky: once cut into pieces a stroke stays replaced even if a stale copy is re-sent.
          split_from = COALESCE(excluded.split_from, strokes.split_from),
-         replaced_by = COALESCE(excluded.replaced_by, strokes.replaced_by)
+         replaced_by = COALESCE(excluded.replaced_by, strokes.replaced_by),
+         size = COALESCE(excluded.size, strokes.size)
        WHERE strokes.session_id = excluded.session_id`,
     );
     const session = this.db.prepare(`SELECT input_kind, has_pressure FROM sessions WHERE id = ?`).get(sessionId) as
@@ -365,6 +441,7 @@ class SqliteDb implements Db {
           is_scribble: s.isScribble ? 1 : 0,
           split_from: s.splitFrom ?? null,
           replaced_by: s.replacedBy?.length ? JSON.stringify(s.replacedBy) : null,
+          size: s.size ?? null,
         });
       }
       this.db
@@ -617,8 +694,8 @@ class SqliteDb implements Db {
     this.db
       .prepare(
         `INSERT INTO lectures (id, course_id, title, media_path, media_type, mime, duration_ms, transcript,
-                               transcript_source, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                               transcript_source, created_at, owner_id, class_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         id,
@@ -631,6 +708,8 @@ class SqliteDb implements Db {
         JSON.stringify(input.words),
         input.transcriptSource,
         createdAt,
+        input.ownerId ?? null,
+        input.classId ?? null,
       );
     return this.readLecture(id)!.lecture;
   }
@@ -647,7 +726,13 @@ class SqliteDb implements Db {
       | (LectureRow & { transcript: string })
       | undefined;
     if (!row) return null;
-    return { lecture: toLecture(row), words: JSON.parse(row.transcript) as TranscriptWord[], mediaPath: row.media_path };
+    return {
+      lecture: toLecture(row),
+      words: JSON.parse(row.transcript) as TranscriptWord[],
+      mediaPath: row.media_path,
+      ownerId: row.owner_id ?? null,
+      classId: row.class_id ?? null,
+    };
   }
 
   async getLecture(id: string): Promise<LectureRecord | null> {
@@ -749,14 +834,175 @@ class SqliteDb implements Db {
     return computeInkWindowStats(await this.getStrokes(sessionId), windowMs);
   }
 
-  async lectureInkHotspots(lectureId: string) {
+  async lectureInkHotspots(lectureId: string, studentIds?: string[]) {
     const rows = this.db
       .prepare(
         `SELECT st.* FROM strokes st JOIN sessions s ON s.id = st.session_id
-         WHERE s.lecture_id = ? ORDER BY st.start_ms, st.rowid`,
+         WHERE s.lecture_id = ? AND (? IS NULL OR s.student_id IN (SELECT value FROM json_each(?)))
+         ORDER BY st.start_ms, st.rowid`,
       )
-      .all(lectureId) as StrokeRow[];
+      .all(lectureId, studentIds ? 1 : null, JSON.stringify(studentIds ?? [])) as StrokeRow[];
     return computeInkHotspots(rows.map(toStroke));
+  }
+
+  // ── Accounts ──
+
+  async createUser(input: NewUser): Promise<User | null> {
+    const id = input.id ?? newId("u_");
+    const res = this.db
+      .prepare(
+        `INSERT INTO users (id, email, name, role, password_hash, created_at) VALUES (?, ?, ?, ?, ?, ?)
+         ON CONFLICT DO NOTHING`,
+      )
+      .run(id, normaliseEmail(input.email), input.name, input.role, input.passwordHash, new Date().toISOString());
+    return res.changes > 0 ? this.getUser(id) : null;
+  }
+
+  async getUser(id: string) {
+    const row = this.db.prepare(`SELECT ${USER_COLS} FROM users WHERE id = ?`).get(id) as UserRow | undefined;
+    return row ? toUser(row) : null;
+  }
+
+  async getUserByEmail(email: string) {
+    const row = this.db
+      .prepare(`SELECT ${USER_COLS}, password_hash FROM users WHERE email = ?`)
+      .get(normaliseEmail(email)) as (UserRow & { password_hash: string | null }) | undefined;
+    return row ? { user: toUser(row), passwordHash: row.password_hash } : null;
+  }
+
+  async setUserName(id: string, name: string) {
+    this.db.prepare(`UPDATE users SET name = ? WHERE id = ?`).run(name, id);
+    return this.getUser(id);
+  }
+
+  async countAccounts() {
+    return (this.db.prepare(`SELECT COUNT(*) AS n FROM users WHERE password_hash IS NOT NULL`).get() as { n: number }).n;
+  }
+
+  async adoptLegacyData(fromStudentId: string, toUserId: string, keepSessionIds: string[]) {
+    return this.db.transaction(() => {
+      const sessions = this.db
+        .prepare(`UPDATE sessions SET student_id = ? WHERE student_id = ? AND id NOT IN (SELECT value FROM json_each(?))`)
+        .run(toUserId, fromStudentId, JSON.stringify(keepSessionIds)).changes;
+      const lectures = this.db
+        .prepare(`UPDATE lectures SET owner_id = ? WHERE owner_id IS NULL AND transcript_source <> 'demo'`)
+        .run(toUserId).changes;
+      return { sessions, lectures };
+    })();
+  }
+
+  async createAuthSession(input: { tokenHash: string; userId: string; expiresAtIso: string }) {
+    this.db
+      .prepare(`INSERT INTO auth_sessions (token_hash, user_id, created_at, expires_at) VALUES (?, ?, ?, ?)`)
+      .run(input.tokenHash, input.userId, new Date().toISOString(), new Date(input.expiresAtIso).toISOString());
+  }
+
+  async getAuthSessionUser(tokenHash: string, nowIso: string) {
+    const row = this.db
+      .prepare(
+        `SELECT u.id, u.email, u.name, u.role, (u.password_hash IS NULL) AS guest, u.created_at
+         FROM auth_sessions a JOIN users u ON u.id = a.user_id
+         WHERE a.token_hash = ? AND a.expires_at > ?`,
+      )
+      .get(tokenHash, new Date(nowIso).toISOString()) as UserRow | undefined;
+    return row ? toUser(row) : null;
+  }
+
+  async deleteAuthSession(tokenHash: string) {
+    this.db.prepare(`DELETE FROM auth_sessions WHERE token_hash = ?`).run(tokenHash);
+  }
+
+  async deleteExpiredAuthSessions(nowIso: string) {
+    return this.db.prepare(`DELETE FROM auth_sessions WHERE expires_at <= ?`).run(new Date(nowIso).toISOString()).changes;
+  }
+
+  // ── Classes ──
+
+  async createClass(input: NewClass): Promise<ClassInfo | null> {
+    const id = input.id ?? newId("c_");
+    const res = this.db
+      .prepare(`INSERT INTO classes (id, teacher_id, name, join_code, created_at) VALUES (?, ?, ?, ?, ?) ON CONFLICT DO NOTHING`)
+      .run(id, input.teacherId, input.name, input.joinCode, new Date().toISOString());
+    return res.changes > 0 ? this.getClass(id) : null;
+  }
+
+  async getClass(id: string) {
+    const row = this.db.prepare(`${CLASS_SELECT} WHERE c.id = ?`).get(id) as ClassRow | undefined;
+    return row ? toClassInfo(row) : null;
+  }
+
+  async getClassByJoinCode(code: string) {
+    const row = this.db.prepare(`${CLASS_SELECT} WHERE c.join_code = ?`).get(code) as ClassRow | undefined;
+    return row ? toClassInfo(row) : null;
+  }
+
+  async listTeacherClasses(teacherId: string) {
+    const rows = this.db
+      .prepare(
+        `SELECT c.id, c.name, c.teacher_id, u.name AS teacher_name, c.join_code, c.created_at,
+                (SELECT COUNT(*) FROM enrollments e WHERE e.class_id = c.id) AS student_count,
+                (SELECT COUNT(*) FROM lectures l WHERE l.class_id = c.id) AS lecture_count
+         FROM classes c JOIN users u ON u.id = c.teacher_id
+         WHERE c.teacher_id = ? ORDER BY c.created_at DESC, c.id`,
+      )
+      .all(teacherId) as Array<ClassRow & { student_count: number; lecture_count: number }>;
+    return rows.map((r) => ({ ...toClassInfo(r), studentCount: Number(r.student_count), lectureCount: Number(r.lecture_count) }));
+  }
+
+  async listStudentClasses(studentId: string): Promise<StudentClass[]> {
+    const rows = this.db
+      .prepare(
+        `SELECT c.id, c.name, u.name AS teacher_name
+         FROM enrollments e JOIN classes c ON c.id = e.class_id JOIN users u ON u.id = c.teacher_id
+         WHERE e.student_id = ? ORDER BY e.created_at, c.id`,
+      )
+      .all(studentId) as Array<{ id: string; name: string; teacher_name: string }>;
+    return rows.map((r) => ({ id: r.id, name: r.name, teacherName: r.teacher_name }));
+  }
+
+  async enroll(classId: string, studentId: string) {
+    return (
+      this.db
+        .prepare(`INSERT INTO enrollments (class_id, student_id, created_at) VALUES (?, ?, ?) ON CONFLICT DO NOTHING`)
+        .run(classId, studentId, new Date().toISOString()).changes > 0
+    );
+  }
+
+  async listClassStudentIds(classId: string) {
+    const rows = this.db
+      .prepare(`SELECT student_id FROM enrollments WHERE class_id = ? ORDER BY created_at, student_id`)
+      .all(classId) as Array<{ student_id: string }>;
+    return rows.map((r) => r.student_id);
+  }
+
+  // ── Lecture visibility ──
+
+  async listVisibleLectures(userId: string): Promise<Lecture[]> {
+    const rows = this.db
+      .prepare(
+        `SELECT ${LECTURE_COLS} FROM lectures WHERE ${VISIBLE_TO}
+         ORDER BY (transcript_source = 'demo') DESC, created_at DESC, id`,
+      )
+      .all({ user: userId }) as LectureRow[];
+    return rows.map(toLecture);
+  }
+
+  async canViewLecture(userId: string, lectureId: string) {
+    return !!this.db.prepare(`SELECT 1 FROM lectures WHERE id = @id AND ${VISIBLE_TO}`).get({ user: userId, id: lectureId });
+  }
+
+  async setLectureClass(lectureId: string, classId: string | null) {
+    return this.db.prepare(`UPDATE lectures SET class_id = ? WHERE id = ?`).run(classId, lectureId).changes > 0;
+  }
+
+  async listLectureSessions(lectureId: string, studentIds: string[]) {
+    const rows = this.db
+      .prepare(
+        `SELECT * FROM sessions WHERE lecture_id = ? AND student_id IN (SELECT value FROM json_each(?))
+         ORDER BY created_at_iso, id`,
+      )
+      .all(lectureId, JSON.stringify(studentIds)) as SessionRow[];
+    return rows.map(toSession);
   }
 
   /**
@@ -829,22 +1075,22 @@ export function openDb(file: string): Db {
 }
 
 // Singleton across Next dev hot reloads.
-const g = globalThis as unknown as { __inklingDb?: Db };
+const g = globalThis as unknown as { __traceitDb?: Db };
 
 /**
  * The app's repository. DATABASE_URL (postgres:// — e.g. a Tiger Data / Timescale Cloud service)
- * selects Postgres; without it, the local SQLite file (INKLING_DB_PATH, default
- * <INKLING_DATA_DIR>/inkling.db, i.e. data/inkling.db; see lib/paths).
+ * selects Postgres; without it, the local SQLite file (TRACEIT_DB_PATH, default
+ * <TRACEIT_DATA_DIR>/traceit.db, i.e. data/traceit.db; see lib/paths).
  */
 export function getDb(): Db {
-  if (!g.__inklingDb) {
+  if (!g.__traceitDb) {
     const url = process.env.DATABASE_URL?.trim();
     if (url) {
-      g.__inklingDb = openPostgresDb(url);
+      g.__traceitDb = openPostgresDb(url);
     } else {
       const file = resolve(/*turbopackIgnore: true*/ process.cwd(), dbPathSetting());
-      g.__inklingDb = openDb(file);
+      g.__traceitDb = openDb(file);
     }
   }
-  return g.__inklingDb;
+  return g.__traceitDb;
 }

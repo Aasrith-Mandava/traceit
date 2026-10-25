@@ -7,8 +7,8 @@ import { cuesToWords, parseCaptions } from '../captions';
 import type { EraseEvent, Stroke, TimelineEvent } from '../types';
 
 // Integration: analysis → cross-session gap resolution → progress, on a throwaway SQLite file.
-const dir = mkdtempSync(join(tmpdir(), 'inkling-gaps-'));
-process.env.INKLING_DB_PATH = join(dir, 'test.db');
+const dir = mkdtempSync(join(tmpdir(), 'traceit-gaps-'));
+process.env.TRACEIT_DB_PATH = join(dir, 'test.db');
 
 let db: ReturnType<typeof import('../db')['getDb']>;
 let analyze: typeof import('../analyze');
@@ -167,7 +167,7 @@ describe('open gaps for a lecture', () => {
     const g1 = await storedGap(s1.id);
     const s2 = await db.createSession({ lectureId: DEMO, courseId: 'calc1', title: 't', studentId: 'st-open' });
 
-    const before = await gaps.getLectureGaps(DEMO, { sessionId: s2.id });
+    const before = await gaps.getLectureGaps(DEMO, { studentId: 'st-open', sessionId: s2.id });
     expect(before.open.map((t) => t.latest.eventId)).toEqual([g1.id]);
     expect(before.open[0].seekMs).toBeLessThanOrEqual(GAP_MS);
     expect(before.open[0].seekMs).toBeGreaterThan(GAP_MS - 30_000);
@@ -176,7 +176,7 @@ describe('open gaps for a lecture', () => {
     const { strokes } = calm(s2.id);
     await db.upsertStrokes(s2.id, strokes);
     await analyze.analyzeSession(s2.id);
-    const after = await gaps.getLectureGaps(DEMO, { sessionId: s2.id });
+    const after = await gaps.getLectureGaps(DEMO, { studentId: 'st-open', sessionId: s2.id });
     expect(after.open).toEqual([]);
     expect(after.carried).toHaveLength(1);
     expect(after.carried[0]).toMatchObject({ here: 'resolved', resolvedBy: 'revisit' });

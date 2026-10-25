@@ -1,4 +1,4 @@
-// Model evaluation: how well Inkling's detectors agree with hand labels of where a student was
+// Model evaluation: how well TraceIt's detectors agree with hand labels of where a student was
 // confused (lecture times she would have marked "?"). Pure — safe on client and server.
 //
 // - Matching is one-to-one within ±toleranceMs, greedy by nearest pair (ties: earlier label, then

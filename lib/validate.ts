@@ -1,5 +1,6 @@
 // Minimal runtime validation for API payloads.
 import type { EraseEvent, Stroke } from "./types";
+import { MAX_STROKE_SIZE, MIN_STROKE_SIZE } from "./toolSizes";
 
 const POINTER_KINDS = new Set(["pen", "mouse", "touch"]);
 const ERASED_BY = new Set<string>(["eraser", "scribble", "strike", "undo"] satisfies EraseEvent["by"][]);
@@ -29,6 +30,8 @@ export function isStroke(v: unknown): v is Stroke {
   if (s.replacedBy != null) {
     if (!Array.isArray(s.replacedBy) || s.replacedBy.length > 1000 || !s.replacedBy.every(isStr)) return false;
   }
+  // Optional pen size (absent = Medium).
+  if (s.size != null && (!isNum(s.size) || s.size < MIN_STROKE_SIZE || s.size > MAX_STROKE_SIZE)) return false;
   return true;
 }
 

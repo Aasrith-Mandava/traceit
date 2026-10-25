@@ -135,7 +135,7 @@ test("live lecture: create → Start → write → speech arrives → End → re
   page.on("pageerror", (e) => errors.push(e.message));
 
   await page.goto("/app");
-  await expect(page.getByTestId("live-lecture-note")).toContainText("only in Live lecture mode, after you press Start");
+  await expect(page.getByTestId("live-lecture-note")).toContainText("only in live mode, after you press Start");
   await page.getByTestId("live-title").fill("Related rates — live");
   await page.getByTestId("live-start").click();
   await page.waitForURL(/\/session\/[^/]+$/);
@@ -223,9 +223,10 @@ test("live lecture: create → Start → write → speech arrives → End → re
   await expect(page.getByTestId("timeline")).toHaveAttribute("data-status", "ready");
   const corrected = page.locator('[data-testid="timeline-marker"][data-type="misconception_corrected"]');
   await expect(corrected).toHaveCount(1);
-  await corrected.first().click();
-  await expect(page.getByTestId("moment-detail")).toBeVisible();
-  await expect(page.getByText("What the lecture was saying")).toBeVisible();
+  // The most important moment (here the only one) opens by itself.
+  await expect(corrected.first()).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByTestId("moment-detail")).toHaveAttribute("data-type", "misconception_corrected");
+  await expect(page.getByText("What the lecture said")).toBeVisible();
   await expect(page.getByTestId("moment-excerpt")).toContainText("differentiate both sides with respect to time");
   // Replay 20 s plays the microphone recording.
   await page.getByTestId("replay").click();

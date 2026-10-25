@@ -1,4 +1,6 @@
 import { failResponse } from "@/lib/ai/http";
+import { notFoundJson, ownedSession } from "@/lib/access";
+import { withUser } from "@/lib/auth/core";
 import { languageFromBody } from "@/lib/ai/languages";
 import { aiService } from "@/lib/ai/service";
 import { readBodyText, sameOriginOnly } from "@/lib/http";
@@ -13,8 +15,9 @@ const MAX_BODY_BYTES = 256;
  * gives the mp3 when a server voice is configured, otherwise the client speaks `text` itself.
  * Nothing from the client is spoken: the text is built on the server from the stored timeline.
  */
-export const POST = sameOriginOnly(async (request: Request, ctx: RouteContext<"/api/sessions/[id]/recap">) => {
+export const POST = sameOriginOnly(withUser(async (request, user, ctx: RouteContext<"/api/sessions/[id]/recap">) => {
   const { id } = await ctx.params;
+  if (!(await ownedSession(user, id))) return notFoundJson("session");
   const body = await readBodyText(request, MAX_BODY_BYTES);
   if (!body.ok) return body.response;
   const lang = languageFromBody(body.value);
@@ -27,4 +30,4 @@ export const POST = sameOriginOnly(async (request: Request, ctx: RouteContext<"/
     console.error(`recap failed for ${id}`, err instanceof Error ? err.message : err);
     return Response.json({ error: "Couldn’t prepare your recap." }, { status: 500 });
   }
-});
+}));

@@ -1,4 +1,6 @@
 import { MAX_BATCH_ITEMS, MAX_STROKES_BODY_BYTES } from "@/lib/autosave";
+import { notFoundJson, ownedSession } from "@/lib/access";
+import { withUser } from "@/lib/auth/core";
 import { getDb } from "@/lib/db";
 import { readJsonBody, sameOriginOnly } from "@/lib/http";
 import type { EraseEvent, Stroke } from "@/lib/types";
@@ -6,11 +8,10 @@ import { isEraseEvent, isStroke } from "@/lib/validate";
 
 // Autosave target. The client (components/SessionCapture) chunks its batches to fit these limits
 // (lib/autosave), so a 4xx here means a payload that will never be accepted as sent.
-export const POST = sameOriginOnly(async (request: Request, ctx: RouteContext<"/api/sessions/[id]/strokes">) => {
+export const POST = sameOriginOnly(withUser(async (request, user, ctx: RouteContext<"/api/sessions/[id]/strokes">) => {
   const { id } = await ctx.params;
   const db = getDb();
-  const session = await db.getSession(id);
-  if (!session) return Response.json({ error: "session not found" }, { status: 404 });
+  if (!(await ownedSession(user, id))) return notFoundJson("session");
 
   const read = await readJsonBody(request, MAX_STROKES_BODY_BYTES);
   if (!read.ok) return read.response;
@@ -34,4 +35,4 @@ export const POST = sameOriginOnly(async (request: Request, ctx: RouteContext<"/
   await db.upsertStrokes(id, cleanStrokes);
   await db.addEraseEvents(id, cleanEvents);
   return Response.json({ ok: true, strokes: cleanStrokes.length, eraseEvents: cleanEvents.length });
-});
+}));

@@ -4,6 +4,8 @@ import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import type { ReadableStream as NodeReadableStream } from "node:stream/web";
 import { cuesToWords, parseCaptions } from "@/lib/captions";
+import { taughtClass } from "@/lib/access";
+import { withUser } from "@/lib/auth/core";
 import { getDb } from "@/lib/db";
 import {
   UPLOAD_DEMO_MESSAGE,
@@ -16,7 +18,6 @@ import {
 import { sameOriginOnly } from "@/lib/http";
 import { clientIp } from "@/lib/landing/ask/origin";
 import { takePublicUploadSlot } from "@/lib/publicUploads";
-import { listLectures } from "@/lib/lecture";
 import { uploadTarget } from "@/lib/storage";
 import {
   MAX_CAPTIONS_BYTES,
@@ -33,13 +34,13 @@ import type { TranscriptWord } from "@/lib/types";
 
 const fail = (status: number, error: string) => Response.json({ error }, { status });
 
-export async function GET() {
-  return Response.json({ lectures: await listLectures() });
-}
+/** The lectures the signed-in user may study: the bundled demo, their own, their classes'. */
+export const GET = withUser(async (_request, user) => Response.json({ lectures: await getDb().listVisibleLectures(user.id) }));
 
 /**
  * Upload a lecture: multipart/form-data with `media` (audio/video), optional `captions` (.vtt/.srt),
- * `title` and `durationMs` (read by the browser from the media element).
+ * `title`, `durationMs` (read by the browser from the media element) and, for a teacher, `classId`
+ * (a class they teach: the lecture is shared with its students). The uploader owns the lecture.
  *
  * Route handlers have no body-size limit of their own in Next 16 (proxyClientMaxBodySize only
  * applies when a proxy is configured, and this app has none), so the limit is enforced here from
@@ -49,7 +50,7 @@ export async function GET() {
  * recording is capped at PUBLIC_UPLOAD_MAX_MB and uploads are rate-limited per IP and per day
  * (lib/publicUploads). The periodic demo reset removes them again (lib/demoReset).
  */
-export const POST = sameOriginOnly(async (request: Request) => {
+export const POST = sameOriginOnly(withUser(async (request, user) => {
   const env = process.env;
   const publicUpload = isDemoMode(env);
   if (publicUpload && !publicUploadsEnabled(env)) return demoForbidden(UPLOAD_DEMO_MESSAGE);
@@ -79,6 +80,16 @@ export const POST = sameOriginOnly(async (request: Request) => {
     form = await request.formData();
   } catch {
     return fail(400, "Could not read the upload.");
+  }
+
+  // Optional class (teachers only, one they teach); anything else is refused before any bytes are stored.
+  const rawClassId = form.get("classId");
+  let classId: string | null = null;
+  if (rawClassId !== null && rawClassId !== "") {
+    if (typeof rawClassId !== "string" || rawClassId.length > 200) return fail(400, "unknown class");
+    const cls = await taughtClass(user, rawClassId);
+    if (!cls) return fail(400, "unknown class");
+    classId = cls.id;
   }
 
   const media = form.get("media");
@@ -122,6 +133,8 @@ export const POST = sameOriginOnly(async (request: Request) => {
       createWriteStream(abs, { flags: "wx", mode: 0o600 }),
     );
     const lecture = await getDb().createLecture({
+      ownerId: user.id,
+      classId,
       title,
       courseId: "general",
       mediaPath: rel,
@@ -142,4 +155,4 @@ export const POST = sameOriginOnly(async (request: Request) => {
     console.error("lecture upload failed", err instanceof Error ? err.message : err);
     return fail(500, "Could not save the lecture.");
   }
-});
+}));

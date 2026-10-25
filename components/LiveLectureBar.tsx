@@ -3,7 +3,7 @@
 import { memo, useEffect, useId, useRef, type ReactNode } from "react";
 import { LIVE_DEMO_MESSAGE, LIVE_LANGUAGES, type LiveCue } from "@/lib/liveLecture";
 import { formatClock } from "@/lib/time";
-import { CloseIcon, MicIcon, PauseIcon, PlayIcon } from "./icons";
+import { CloseIcon, PauseIcon, PlayIcon } from "./icons";
 import { iconBtn } from "./ui";
 import type { LiveCapture } from "./useLiveCapture";
 
@@ -31,59 +31,69 @@ interface BarProps {
 }
 
 /**
- * Replaces the lecture player for a Live lecture: Start / Pause, the mic status pill with a level
- * meter, the session clock and the recognition language. A quiet strip underneath says what the
- * microphone is doing and discloses that speech is transcribed by the browser's speech service.
+ * Replaces the lecture player for a Live lecture, in the same dark band: Start / Pause, the mic
+ * status pill (pink live dot and level meter while listening), the session clock and the
+ * recognition language. A quiet strip underneath says what the microphone is doing and discloses
+ * that speech is transcribed by the browser's speech service.
  */
 export function LiveLectureBar({ live, title, available, actions, aside }: BarProps) {
   const langId = useId();
-  const { status, mic, support, attachLevel, getMs, language, setLanguage, saveError, speechError, start, pause } = live;
+  const { status, mic, support, attachLevel, getMs, language, setLanguage, saveError, speechError, micSilent, start, pause } =
+    live;
   const running = status === "running";
   const listening = running && mic === "on";
   const canStart = available && status !== "starting" && status !== "ended";
 
+  const quiet = "border-white/15 bg-white/5 text-night-text";
   const pill = listening
-    ? { label: "Listening", tone: "border-accent/30 bg-accent-soft text-accent-press", dot: "bg-accent" }
+    ? { label: "Listening", tone: "border-breakthrough/50 bg-breakthrough/15 text-margin", dot: "bg-breakthrough" }
     : running
-      ? { label: "Notes only", tone: "border-line bg-chrome text-ink-muted", dot: "bg-ink-subtle" }
+      ? { label: "Notes only", tone: quiet, dot: "bg-night-text/60" }
       : status === "paused"
-        ? { label: "Paused", tone: "border-line bg-chrome text-ink-muted", dot: "bg-gap" }
+        ? { label: "Paused", tone: quiet, dot: "bg-gap" }
         : status === "starting"
-          ? { label: "Starting…", tone: "border-line bg-chrome text-ink-muted", dot: "bg-ink-subtle" }
+          ? { label: "Starting…", tone: quiet, dot: "bg-night-text/60" }
           : status === "ended"
-            ? { label: "Ended", tone: "border-line bg-chrome text-ink-muted", dot: "bg-ink-subtle" }
-            : { label: "Ready", tone: "border-line bg-chrome text-ink-muted", dot: "bg-ink-subtle" };
+            ? { label: "Ended", tone: quiet, dot: "bg-night-text/60" }
+            : { label: "Ready", tone: quiet, dot: "bg-night-text/60" };
 
   let note: ReactNode;
-  let noteTone = "text-ink-subtle";
+  let noteTone = "text-night-text";
   if (!available) {
     note = LIVE_DEMO_MESSAGE;
   } else if (mic === "blocked") {
-    noteTone = "text-danger";
+    noteTone = "text-red-300";
     note = "Microphone blocked — allow it from the address bar to transcribe. Your notes are still timed from Start.";
   } else if (mic === "unavailable" || (support && !support.mic)) {
     note = support?.secure === false
       ? "The microphone needs HTTPS or localhost, so there’s no live transcript here. You can still take notes, timed from Start."
       : "No microphone is available, so there’s no live transcript. You can still take notes, timed from Start.";
+  } else if (micSilent && mic === "on") {
+    noteTone = "text-red-300";
+    note =
+      "Your microphone is sending pure silence, so there’s nothing to transcribe. Allow this browser in System Settings → Privacy & Security → Microphone (then restart it), or pick another input device.";
   } else if (support && !support.speech) {
     note = "This browser can’t transcribe speech (try Chrome or Edge). You can still take notes, timed from Start.";
   } else if (speechError) {
-    noteTone = "text-danger";
+    noteTone = "text-red-300";
     note = speechError;
   } else if (mic === "on" && status !== "ended") {
     note = (
       <>
-        <span className="font-semibold text-accent-press">Microphone on</span>
+        <span className="font-bold text-margin">Microphone on</span>
         {running ? "" : " (paused, not recording)"} · Speech is transcribed by your browser’s speech service.
       </>
     );
   } else {
-    note = "Press Start to begin. Inkling asks for the microphone only then. Speech is transcribed by your browser’s speech service.";
+    note = "Press Start to begin. TraceIt asks for the microphone only then. Speech is transcribed by your browser’s speech service.";
   }
 
   return (
-    <div className="shrink-0 border-b border-line bg-desk">
-      <section aria-label="Live lecture" className="flex min-h-[var(--tape-h)] items-center gap-2 px-2 sm:gap-3 sm:px-3">
+    <div className="shrink-0 bg-night text-white">
+      <section
+        aria-label="Live lecture"
+        className="flex min-h-[var(--tape-h)] flex-wrap items-center gap-x-2 gap-y-2 px-3 py-2.5 sm:gap-x-4 sm:px-6"
+      >
         <button
           type="button"
           data-testid="live-toggle"
@@ -91,10 +101,10 @@ export function LiveLectureBar({ live, title, available, actions, aside }: BarPr
           onClick={() => void (running ? pause() : start())}
           disabled={!canStart}
           aria-label={running ? "Pause live lecture" : status === "paused" ? "Resume live lecture" : "Start live lecture"}
-          className="press group inline-flex min-h-11 shrink-0 items-center gap-2 rounded-pill pr-3 pl-1.5 text-sm font-semibold text-ink disabled:cursor-not-allowed disabled:opacity-50"
+          className="press group inline-flex min-h-11 shrink-0 items-center gap-2.5 rounded-pill pr-3 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
         >
-          <span className="inline-flex size-8 items-center justify-center rounded-pill bg-ink text-paper transition-colors group-hover:bg-accent group-disabled:group-hover:bg-ink">
-            {running ? <PauseIcon size={14} /> : <PlayIcon size={14} className="translate-x-px" />}
+          <span className="inline-flex size-10 items-center justify-center rounded-pill bg-highlight text-on-highlight transition-colors group-hover:bg-highlight-strong group-disabled:group-hover:bg-highlight">
+            {running ? <PauseIcon size={16} /> : <PlayIcon size={16} className="translate-x-px" />}
           </span>
           {running ? "Pause" : status === "paused" ? "Resume" : "Start"}
         </button>
@@ -106,14 +116,14 @@ export function LiveLectureBar({ live, title, available, actions, aside }: BarPr
           aria-label={listening ? "Microphone on — listening" : pill.label}
           className={`inline-flex min-h-8 shrink-0 items-center gap-2 rounded-pill border px-3 text-xs font-bold tracking-wide uppercase ${pill.tone}`}
         >
-          {listening ? <MicIcon size={14} /> : <span aria-hidden="true" className={`size-1.5 rounded-pill ${pill.dot}`} />}
+          <span aria-hidden="true" className={`size-2 rounded-pill ${pill.dot}`} />
           {pill.label}
           {listening ? (
-            <span aria-hidden="true" className="relative hidden h-1.5 w-10 overflow-hidden rounded-pill bg-accent/15 sm:block">
+            <span aria-hidden="true" className="relative hidden h-1.5 w-10 overflow-hidden rounded-pill bg-breakthrough/25 sm:block">
               <span
                 ref={attachLevel}
                 data-testid="mic-level"
-                className="absolute inset-0 origin-left rounded-pill bg-accent"
+                className="absolute inset-0 origin-left rounded-pill bg-margin"
                 style={{ transform: "scaleX(0)" }}
               />
             </span>
@@ -121,8 +131,8 @@ export function LiveLectureBar({ live, title, available, actions, aside }: BarPr
         </span>
 
         <div className="flex min-w-0 flex-1 items-center justify-end gap-3 sm:justify-start">
-          <span className="hidden max-w-[16rem] truncate text-sm font-medium text-ink-muted md:block">{title}</span>
-          <span className="shrink-0 font-mono text-sm tabular-nums text-ink sm:ml-auto">
+          <span className="hidden max-w-[16rem] truncate text-sm font-semibold text-night-text md:block">{title}</span>
+          <span className="shrink-0 font-mono text-[13px] tabular-nums text-white sm:ml-auto">
             <LiveClockText getMs={getMs} />
           </span>
         </div>
@@ -136,7 +146,7 @@ export function LiveLectureBar({ live, title, available, actions, aside }: BarPr
           value={language}
           onChange={(e) => setLanguage(e.target.value)}
           disabled={!available || support?.speech === false}
-          className="hidden min-h-11 max-w-[9.5rem] cursor-pointer truncate rounded-pill border border-line bg-chrome px-3 text-sm text-ink-muted transition-colors hover:border-accent/60 disabled:cursor-not-allowed disabled:opacity-60 sm:block"
+          className="hidden min-h-11 max-w-[9.5rem] cursor-pointer truncate rounded-[10px] border border-white/20 bg-night-raised px-3 text-sm text-white [color-scheme:dark] transition-colors hover:border-accent-light disabled:cursor-not-allowed disabled:opacity-60 sm:block"
         >
           {LIVE_LANGUAGES.map((l) => (
             <option key={l.tag} value={l.tag}>
@@ -147,15 +157,18 @@ export function LiveLectureBar({ live, title, available, actions, aside }: BarPr
         {actions}
         {aside}
       </section>
-      <p data-testid="live-note" className={`border-t border-line/70 px-3 py-1.5 text-xs text-pretty sm:px-4 ${noteTone}`}>
+      <p data-testid="live-note" className={`border-t border-white/10 px-3 py-1.5 text-xs text-pretty sm:px-6 ${noteTone}`}>
         {note}
-        {saveError ? <span className="text-danger"> {saveError}</span> : null}
+        {saveError ? <span className="text-red-300"> {saveError}</span> : null}
       </p>
     </div>
   );
 }
 
-/** The live transcript: final cues as timestamped lines, the words being heard in grey below. */
+/**
+ * The live captions: final cues as timestamped lines, the words being heard in grey below. A white
+ * card beside the page on wide screens, a sheet over its lower part on narrow ones.
+ */
 export const LiveTranscriptPanel = memo(function LiveTranscriptPanel({
   cues,
   interim,
@@ -181,14 +194,17 @@ export const LiveTranscriptPanel = memo(function LiveTranscriptPanel({
   return (
     <aside
       id={id}
-      aria-label="Live transcript"
+      aria-label="Live captions"
       data-testid="live-transcript"
-      className="absolute inset-x-0 bottom-0 z-20 flex h-[40%] flex-col rounded-t-lg border-t border-line bg-chrome shadow-page lg:static lg:z-auto lg:h-auto lg:w-[21rem] lg:shrink-0 lg:rounded-none lg:border-t-0 lg:border-l lg:shadow-none"
+      className="absolute inset-x-0 bottom-0 z-20 flex h-[40%] flex-col overflow-hidden rounded-t-lg border-t border-line bg-chrome shadow-page lg:static lg:z-auto lg:h-auto lg:w-[21rem] lg:shrink-0 lg:rounded-lg lg:border lg:shadow-card"
     >
-      <header className="flex min-h-12 shrink-0 items-center gap-2 border-b border-line pr-1 pl-4">
-        <h2 className="text-sm font-bold tracking-tight text-ink">Transcript</h2>
-        <span className="text-xs text-ink-subtle">Live</span>
-        <button type="button" data-testid="transcript-close" onClick={onClose} aria-label="Close transcript" className={`${iconBtn} ml-auto`}>
+      <header className="flex min-h-14 shrink-0 items-center gap-2.5 border-b border-line pr-1.5 pl-4">
+        <h2 className="text-base font-bold text-ink">Captions</h2>
+        <span className="inline-flex items-center gap-1.5 rounded-pill bg-breakthrough-soft px-2.5 py-0.5 text-xs font-bold text-breakthrough-strong">
+          <span aria-hidden="true" className="size-1.5 rounded-pill bg-breakthrough" />
+          Live
+        </span>
+        <button type="button" data-testid="transcript-close" onClick={onClose} aria-label="Close captions" className={`${iconBtn} ml-auto`}>
           <CloseIcon size={18} />
         </button>
       </header>
@@ -196,12 +212,12 @@ export const LiveTranscriptPanel = memo(function LiveTranscriptPanel({
         ref={scrollRef}
         tabIndex={0}
         aria-live="polite"
-        aria-label="Live transcript text"
+        aria-label="Live captions text"
         onScroll={(e) => {
           const b = e.currentTarget;
           stickRef.current = b.scrollHeight - b.scrollTop - b.clientHeight < 40;
         }}
-        className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-3 text-[15px] leading-7 text-ink-muted"
+        className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-3 text-[15px] leading-7 text-ink-muted"
       >
         {cues.length === 0 && !interim ? (
           <p data-testid="live-transcript-empty" className="px-1 text-sm text-pretty text-ink-subtle">

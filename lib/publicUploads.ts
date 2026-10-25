@@ -15,9 +15,9 @@ interface State {
   global: number[];
 }
 
-const g = globalThis as unknown as { __inklingPublicUploads?: State };
+const g = globalThis as unknown as { __traceitPublicUploads?: State };
 const state = (): State =>
-  (g.__inklingPublicUploads ??= {
+  (g.__traceitPublicUploads ??= {
     perIp: createRateLimiter({ limit: PUBLIC_UPLOADS_PER_IP_PER_HOUR, windowMs: HOUR }),
     global: [],
   });
@@ -51,5 +51,5 @@ export function takePublicUploadSlot(ip: string, dailyCap: number, now: number =
 
 /** Forgets every count (tests). */
 export function resetPublicUploadLimits(): void {
-  delete g.__inklingPublicUploads;
+  delete g.__traceitPublicUploads;
 }

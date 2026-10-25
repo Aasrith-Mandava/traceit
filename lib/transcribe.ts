@@ -38,11 +38,11 @@ export interface Transcriber {
 }
 
 /**
- * Which Whisper service transcribes lectures, or null (no key, INKLING_DISABLE_AI=1, or DEMO_MODE:
+ * Which Whisper service transcribes lectures, or null (no key, TRACEIT_DISABLE_AI=1, or DEMO_MODE:
  * the public demo is offline even when GROQ_API_KEY is set for the landing assistant).
  */
 export function selectTranscriber(env: Env = process.env): Transcriber | null {
-  if (env.INKLING_DISABLE_AI === "1" || isDemoMode(env)) return null;
+  if ((env.TRACEIT_DISABLE_AI ?? env.INKLING_DISABLE_AI) === "1" || isDemoMode(env)) return null;
   const openai = envKey(env, "OPENAI_API_KEY");
   if (openai) {
     return {

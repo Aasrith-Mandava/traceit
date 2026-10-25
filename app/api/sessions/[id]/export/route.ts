@@ -1,4 +1,6 @@
 import { analyzeSession } from "@/lib/analyze";
+import { notFoundJson, ownedSession } from "@/lib/access";
+import { withUser } from "@/lib/auth/core";
 import { getDb } from "@/lib/db";
 import { sameOriginOnly } from "@/lib/http";
 import { buildNotabilityExport, exportFileName } from "@/lib/notabilityExport";
@@ -10,11 +12,11 @@ import { buildNotabilityExport, exportFileName } from "@/lib/notabilityExport";
  * as the review and compare pages do), so the PDF's moments always match their counts. Always a
  * download (attachment) with nosniff.
  */
-export const GET = sameOriginOnly(async (_request: Request, ctx: RouteContext<"/api/sessions/[id]/export">) => {
+export const GET = sameOriginOnly(withUser(async (_request, user, ctx: RouteContext<"/api/sessions/[id]/export">) => {
   const { id } = await ctx.params;
   const db = getDb();
-  const session = await db.getSession(id);
-  if (!session) return Response.json({ error: "session not found" }, { status: 404 });
+  const session = await ownedSession(user, id);
+  if (!session) return notFoundJson("session");
   let analysis = await db.getAnalysis(id);
   if (!analysis || analysis.stale) {
     await analyzeSession(id);
@@ -33,7 +35,7 @@ export const GET = sameOriginOnly(async (_request: Request, ctx: RouteContext<"/
       revisions: analysis?.revisions ?? [],
     });
   } catch (err) {
-    console.error(`[inkling] export ${id} failed: ${err instanceof Error ? err.message : String(err)}`);
+    console.error(`[traceit] export ${id} failed: ${err instanceof Error ? err.message : String(err)}`);
     return Response.json({ error: "Could not build the PDF." }, { status: 500 });
   }
 
@@ -48,4 +50,4 @@ export const GET = sameOriginOnly(async (_request: Request, ctx: RouteContext<"/
       "Cache-Control": "private, no-store",
     },
   });
-});
+}));

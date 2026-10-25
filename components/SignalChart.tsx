@@ -1,8 +1,10 @@
 "use client";
 
-// Signal Lab chart: over lecture time, the smoothed hesitation score (line) and raw score (columns)
-// against the spike threshold, the baseline stretches, the timeline moments, and — on the same time
-// axis — one strip per hesitation feature. Hand-rolled SVG; one y-scale (every value is 0..1).
+// "See the details" chart: over lecture time, the smoothed hesitation score (ink-indigo line) and
+// raw score (light indigo columns) against the spike threshold (the lime "flagged" zone above a dashed
+// rule), the baseline stretches, the learning-trail moments (Fixed ● / Still fuzzy ○ / Aha ◆), and —
+// on the same time axis — one strip per hesitation feature. Hand-rolled SVG; one y-scale (every value
+// is 0..1).
 //
 // Interaction: a crosshair snaps to the 10 s window under the pointer and a tooltip lists its
 // feature values and reasons. Keyboard: the plot is one tab stop (← → Home End move between
@@ -173,18 +175,31 @@ export default function SignalChart({ data, sessionId, sessionTitle }: { data: S
           onClick={onPlotClick}
           className="block max-w-full select-none"
         >
-          {/* Baseline stretches: "your normal" — never flagged. Hatched like the review timeline. */}
+          {/* The flagged zone: a lime highlighter wash above the spike threshold ("what matters"). */}
+          <rect
+            aria-hidden="true"
+            x={M.left}
+            y={yScore(1)}
+            width={plotW}
+            height={Math.max(0, yScore(spikeScore) - yScore(1))}
+            className="fill-highlight/45"
+          />
+
+          {/* Baseline stretches: "your normal" — never flagged. Hatched like the review timeline, on an
+              opaque base so the lime flagged wash never shows through (it doesn't apply there). */}
           <defs>
             <pattern id={hatchId} width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(135)">
               <rect width="7" height="7" className="fill-transparent" />
-              <line x1="0" y1="0" x2="0" y2="7" strokeWidth="1" className="stroke-ink/[0.07]" />
+              <line x1="0" y1="0" x2="0" y2="7" strokeWidth="1" className="stroke-ink/[0.15]" />
             </pattern>
           </defs>
           {data.baseline.map((z, i) => (
             <g key={z.startMs} data-testid="signal-baseline" aria-hidden="true">
+              <rect x={x(z.startMs)} y={scoreTop} width={Math.max(1, x(z.endMs) - x(z.startMs))} height={plotBottom - scoreTop} className="fill-chrome" />
+              <rect x={x(z.startMs)} y={scoreTop} width={Math.max(1, x(z.endMs) - x(z.startMs))} height={plotBottom - scoreTop} className="fill-ink/[0.03]" />
               <rect x={x(z.startMs)} y={scoreTop} width={Math.max(1, x(z.endMs) - x(z.startMs))} height={plotBottom - scoreTop} fill={`url(#${hatchId})`} />
               {i === 0 ? (
-                <text x={x(z.startMs) + 6} y={scoreTop + 14} className="fill-ink-subtle text-[10px] font-medium tracking-wide uppercase">
+                <text x={x(z.startMs) + 6} y={plotBottom - 8} className="fill-ink-subtle text-[10px] font-medium tracking-wide uppercase">
                   Baseline · your normal
                 </text>
               ) : null}
@@ -229,7 +244,7 @@ export default function SignalChart({ data, sessionId, sessionTitle }: { data: S
                   width={barW}
                   height={Math.max(0, yScore(0) - yScore(p.rawScore))}
                   rx={Math.min(2, barW / 2)}
-                  className="fill-accent/[0.13]"
+                  className="fill-accent-light/30"
                 />
               ),
             )}
@@ -244,7 +259,7 @@ export default function SignalChart({ data, sessionId, sessionTitle }: { data: S
               y2={yScore(spikeScore)}
               strokeWidth={1.5}
               strokeDasharray="5 4"
-              className="stroke-gap-strong/70"
+              className="stroke-ink/60"
             />
             <text x={M.left + plotW - 4} y={yScore(spikeScore) - 5} textAnchor="end" className="fill-ink-muted text-[10.5px] font-medium">
               Spike threshold {formatScore(spikeScore)}
@@ -326,7 +341,7 @@ export default function SignalChart({ data, sessionId, sessionTitle }: { data: S
               data-testid="signal-event-marker"
               data-type={m.type}
               data-event-id={m.id}
-              aria-label={`${MOMENT_META[m.type].label} at ${formatClock(m.lectureMs)}: ${m.label}. Open in review`}
+              aria-label={`${MOMENT_META[m.type].label} at ${formatClock(m.lectureMs)}: ${m.label}. Open in study mode`}
               onClick={(e) => {
                 e.preventDefault();
                 router.push(reviewHref(sessionId, m.id));
@@ -348,7 +363,7 @@ export default function SignalChart({ data, sessionId, sessionTitle }: { data: S
                 data-testid="signal-spike"
                 data-start-ms={p.startMs}
                 data-event-id={p.eventId ?? ""}
-                aria-label={`Spike at ${formatClock(p.startMs)}, score ${formatScore(p.score)}${p.reasons.length ? `: ${p.reasons.join("; ")}` : ""}. Open this moment in review`}
+                aria-label={`Spike at ${formatClock(p.startMs)}, score ${formatScore(p.score)}${p.reasons.length ? `: ${p.reasons.join("; ")}` : ""}. Open this moment in study mode`}
                 onFocus={() => {
                   setKeyboard(true);
                   setActive(i);
@@ -393,7 +408,7 @@ export default function SignalChart({ data, sessionId, sessionTitle }: { data: S
       <figcaption className="flex flex-wrap items-center gap-x-5 gap-y-1.5 px-1 text-xs text-ink-muted">
         <LegendKey kind="line">Smoothed score</LegendKey>
         <LegendKey kind="column">Raw score (this window only)</LegendKey>
-        <LegendKey kind="dash">Spike threshold</LegendKey>
+        <LegendKey kind="dash">Spike threshold (flagged above)</LegendKey>
         <LegendKey kind="spike">Spike — click to open the moment</LegendKey>
         <LegendKey kind="bar">Signal on (≥ {formatScore(featureOn)})</LegendKey>
         <LegendKey kind="hatch">Baseline</LegendKey>
@@ -409,8 +424,13 @@ function LegendKey({ kind, children }: { kind: "line" | "column" | "dash" | "spi
     <span className="inline-flex items-center gap-1.5">
       <svg width="18" height="12" viewBox="0 0 18 12" aria-hidden="true">
         {kind === "line" ? <line x1="1" x2="17" y1="6" y2="6" strokeWidth="2" strokeLinecap="round" className="stroke-accent" /> : null}
-        {kind === "column" ? <rect x="5" y="2" width="8" height="10" rx="2" className="fill-accent/[0.13]" /> : null}
-        {kind === "dash" ? <line x1="0" x2="18" y1="6" y2="6" strokeWidth="1.5" strokeDasharray="5 4" className="stroke-gap-strong/70" /> : null}
+        {kind === "column" ? <rect x="5" y="2" width="8" height="10" rx="2" className="fill-accent-light/30" /> : null}
+        {kind === "dash" ? (
+          <>
+            <rect x="0" y="0" width="18" height="6" className="fill-highlight/45" />
+            <line x1="0" x2="18" y1="6" y2="6" strokeWidth="1.5" strokeDasharray="5 4" className="stroke-ink/60" />
+          </>
+        ) : null}
         {kind === "spike" ? <circle cx="9" cy="6" r="4.5" strokeWidth="2" className="fill-gap stroke-chrome" /> : null}
         {kind === "bar" ? (
           <>
@@ -432,7 +452,7 @@ function Tooltip({ point: p, spikeScore, featureOn, left, width }: { point: Sign
       data-testid="signal-tooltip"
       data-start-ms={p.startMs}
       aria-hidden="true"
-      className="pointer-events-none absolute top-8 z-10 flex flex-col gap-2 rounded-md border border-line bg-chrome/95 px-3 py-2.5 text-xs shadow-page backdrop-blur-sm"
+      className="pointer-events-none absolute top-8 z-10 flex flex-col gap-2 rounded-[14px] border border-line bg-chrome px-3.5 py-3 text-xs shadow-lift"
       style={{ left, width }}
     >
       <div className="flex items-baseline justify-between gap-2">
@@ -440,7 +460,7 @@ function Tooltip({ point: p, spikeScore, featureOn, left, width }: { point: Sign
           {formatClock(p.startMs)}–{formatClock(p.endMs)}
         </span>
         <span
-          className={`rounded-pill px-1.5 py-px text-[10.5px] font-semibold ${
+          className={`rounded-pill px-2 py-px text-[10.5px] font-bold ${
             p.isSpike ? "bg-gap-soft text-gap-strong" : p.phase === "scored" ? "bg-chrome-press text-ink-muted" : "bg-chrome-press text-ink-subtle"
           }`}
         >
@@ -452,7 +472,7 @@ function Tooltip({ point: p, spikeScore, featureOn, left, width }: { point: Sign
       ) : (
         <>
           <div className="flex items-baseline gap-2">
-            <span className="text-lg leading-none font-semibold text-ink">{formatScore(p.score)}</span>
+            <span className="font-display text-xl leading-none font-extrabold text-ink">{formatScore(p.score)}</span>
             <span className="text-ink-muted">
               smoothed · {above ? "above" : "below"} {formatScore(spikeScore)}
             </span>
@@ -491,7 +511,7 @@ function Tooltip({ point: p, spikeScore, featureOn, left, width }: { point: Sign
               {p.note}
             </p>
           ) : null}
-          {p.isSpike ? <p className="font-medium text-accent">Click to open this moment in review</p> : null}
+          {p.isSpike ? <p className="font-bold text-accent">Click to open this moment in study mode</p> : null}
         </>
       )}
     </div>

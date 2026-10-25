@@ -81,6 +81,11 @@ export function useLiveSupport(): LiveSupport | null {
   return useSyncExternalStore(noSubscribe, readSupport, () => null);
 }
 
+/** How long listening may go without a single word back before the student is told why. */
+const NOTHING_HEARD_MS = 15_000;
+const NOTHING_HEARD =
+  "No captions yet. If someone has been talking, this browser’s speech service isn’t answering: live captions need Chrome, Edge or Safari online (not automated or privacy-hardened browsers such as Brave). Your recording and notes still work.";
+
 /**
  * One continuous recognition "session" as the student sees it: Chrome ends recognition after a
  * stretch of silence (or a network hiccup), so it is started again until stop() — with a short
@@ -92,6 +97,9 @@ class SpeechLoop {
   private lang = DEFAULT_LIVE_LANGUAGE;
   private delay = 250;
   private timer: ReturnType<typeof setTimeout> | null = null;
+  /** Whether the speech service has sent back any words yet (for the "nothing heard" note). */
+  private heard = false;
+  private watchdog: ReturnType<typeof setTimeout> | null = null;
 
   constructor(
     private cb: {
@@ -109,6 +117,24 @@ class SpeechLoop {
     this.delay = 250;
     if (restart && this.rec) this.rec.stop();
     else if (!this.rec) this.open();
+    this.armWatchdog();
+  }
+
+  /**
+   * Some browsers expose the API but their speech service never answers (automated or
+   * privacy-hardened Chromium builds, or no connection): say so instead of staying silent.
+   */
+  private armWatchdog() {
+    if (this.watchdog) clearTimeout(this.watchdog);
+    if (this.heard) return;
+    this.watchdog = setTimeout(() => {
+      if (this.want && !this.heard) this.cb.onError(NOTHING_HEARD);
+    }, NOTHING_HEARD_MS);
+  }
+
+  private clearWatchdog() {
+    if (this.watchdog) clearTimeout(this.watchdog);
+    this.watchdog = null;
   }
 
   private open() {
@@ -129,6 +155,8 @@ class SpeechLoop {
       }
       this.cb.onInterim(pending.trim());
       this.cb.onError(null); // hearing again: any "can't be reached" note is stale
+      this.heard = true;
+      this.clearWatchdog();
       this.delay = 250;
     };
     rec.onerror = (e) => {
@@ -140,6 +168,8 @@ class SpeechLoop {
         this.cb.onError("This browser can’t transcribe that language. Pick another one.");
       } else if (e.error === "network") {
         this.cb.onError("The browser’s speech service can’t be reached — retrying.");
+      } else if (e.error === "audio-capture") {
+        this.cb.onError("The speech service can’t use your microphone (another app may have it) — retrying.");
       }
     };
     rec.onend = () => {
@@ -162,6 +192,7 @@ class SpeechLoop {
   stop(): Promise<void> {
     this.want = false;
     if (this.timer) clearTimeout(this.timer);
+    this.clearWatchdog();
     const rec = this.rec;
     if (!rec) return Promise.resolve();
     return new Promise<void>((resolve) => {
@@ -183,6 +214,7 @@ class SpeechLoop {
   abort() {
     this.want = false;
     if (this.timer) clearTimeout(this.timer);
+    this.clearWatchdog();
     try {
       this.rec?.abort();
     } catch {
@@ -217,12 +249,16 @@ interface Options {
 
 /** How often unsaved cues are sent. */
 const CUE_FLUSH_MS = 3000;
+/** How long the mic may send pure digital silence before the student is told why. */
+const SILENT_MIC_MS = 4000;
 
 export function useLiveCapture({ lectureId, enabled, offsetMs }: Options) {
   const support = useLiveSupport();
   const [status, setStatus] = useState<LiveStatus>("idle");
   const [mic, setMic] = useState<MicState>("off");
   const [speechError, setSpeechError] = useState<string | null>(null);
+  /** The mic is open but sends exact digital silence (macOS hasn't let this browser hear it). */
+  const [micSilent, setMicSilent] = useState(false);
   const [cues, setCues] = useState<LiveCue[]>([]);
   const [interim, setInterim] = useState("");
   const [language, setLanguageState] = useState(DEFAULT_LIVE_LANGUAGE);
@@ -340,10 +376,25 @@ export function useLiveCapture({ lectureId, enabled, offsetMs }: Options) {
     ctx.createMediaStreamSource(stream).connect(analyser);
     const data = new Uint8Array(analyser.fftSize);
     let smooth = 0;
+    // A real room, however quiet, never reads exactly 128 everywhere; an input the OS blocks does.
+    const openedAt = performance.now();
+    let heardSignal = false;
+    let flagged = false;
     const tick = () => {
       analyser.getByteTimeDomainData(data);
       let sum = 0;
-      for (const v of data) sum += ((v - 128) / 128) ** 2;
+      let signal = false;
+      for (const v of data) {
+        if (v !== 128) signal = true;
+        sum += ((v - 128) / 128) ** 2;
+      }
+      if (signal && !heardSignal) {
+        heardSignal = true;
+        if (flagged) setMicSilent(false);
+      } else if (!heardSignal && !flagged && performance.now() - openedAt > SILENT_MIC_MS) {
+        flagged = true;
+        setMicSilent(true);
+      }
       const rms = Math.sqrt(sum / data.length);
       smooth = Math.max(rms * 4, smooth * 0.85);
       if (levelElRef.current) levelElRef.current.style.transform = `scaleX(${Math.min(1, smooth).toFixed(3)})`;
@@ -509,6 +560,7 @@ export function useLiveCapture({ lectureId, enabled, offsetMs }: Options) {
     status,
     mic,
     speechError,
+    micSilent,
     saveError,
     cues,
     interim,

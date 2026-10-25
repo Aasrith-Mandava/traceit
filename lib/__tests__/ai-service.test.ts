@@ -10,8 +10,8 @@ import type { EraseEvent, Stroke, TimelineEvent } from '../types';
 
 // Integration: AI help / revision reading / labels / TTS over a throwaway SQLite file. Providers are
 // the deterministic fake (or spies around it); fetch is always a mock — never the network.
-const dir = mkdtempSync(join(tmpdir(), 'inkling-ai-'));
-process.env.INKLING_DB_PATH = join(dir, 'test.db');
+const dir = mkdtempSync(join(tmpdir(), 'traceit-ai-'));
+process.env.TRACEIT_DB_PATH = join(dir, 'test.db');
 
 let db: ReturnType<typeof import('../db')['getDb']>;
 let analyze: typeof import('../analyze');
@@ -157,6 +157,20 @@ describe('help', () => {
     const limited = await svc.getHelp(gap.id);
     expect(limited).toMatchObject({ ok: false, status: 429 });
     expect(!limited.ok && limited.retryAfterMs).toBeGreaterThan(0);
+  });
+
+  it('shares one budget across an account’s sessions; demo guests get one per session', async () => {
+    const first = await seed(undefined, 'st-rate-account');
+    const second = await seed(undefined, 'st-rate-account');
+    const svc = service.createAiService({ env: FAKE_ENV, provider: spy(), limits: limits(1) });
+    expect((await svc.getHelp(first.gap.id)).ok).toBe(true);
+    expect(await svc.getHelp(second.gap.id)).toMatchObject({ ok: false, status: 429 });
+
+    const guestA = await seed(undefined, 'demo-student');
+    const guestB = await seed(undefined, 'demo-student');
+    const guests = service.createAiService({ env: FAKE_ENV, provider: spy(), limits: limits(1) });
+    expect((await guests.getHelp(guestA.gap.id)).ok).toBe(true);
+    expect((await guests.getHelp(guestB.gap.id)).ok).toBe(true);
   });
 
   it('counts a fresh concept-label generation against the session rate limit', async () => {
@@ -327,13 +341,13 @@ describe('status().tts: whether the server has a voice (so Read aloud can decide
     expect(tts(FAKE_ENV)).toBe(false);
     expect(tts({ ELEVENLABS_API_KEY: 'el-key' })).toBe(true);
     expect(tts({ OPENAI_API_KEY: 'sk-key' })).toBe(true);
-    expect(tts({ OPENAI_API_KEY: 'sk-key', INKLING_DISABLE_AI: '1' })).toBe(false);
+    expect(tts({ OPENAI_API_KEY: 'sk-key', TRACEIT_DISABLE_AI: '1' })).toBe(false);
     expect(tts({ ELEVENLABS_API_KEY: 'el-key', DEMO_MODE: '1' })).toBe(false);
   });
 });
 
-describe('test-only "x-inkling-ai: off" header', () => {
-  const off = new Headers({ 'x-inkling-ai': 'off' });
+describe('test-only "x-traceit-ai: off" header', () => {
+  const off = new Headers({ 'x-traceit-ai': 'off' });
 
   it('turns AI off outside production, and only ever off', () => {
     vi.stubEnv('NODE_ENV', 'development');
@@ -341,7 +355,7 @@ describe('test-only "x-inkling-ai: off" header', () => {
     try {
       expect(service.aiDisabledByRequest(off)).toBe(true);
       expect(service.aiService(off).status()).toMatchObject({ enabled: false, mode: 'off' });
-      expect(service.aiDisabledByRequest(new Headers({ 'x-inkling-ai': 'openai' }))).toBe(false);
+      expect(service.aiDisabledByRequest(new Headers({ 'x-traceit-ai': 'openai' }))).toBe(false);
       expect(service.aiService(new Headers()).status()).toMatchObject({ enabled: true, mode: 'fake' });
     } finally {
       vi.unstubAllEnvs();

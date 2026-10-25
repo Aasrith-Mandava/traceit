@@ -1,3 +1,5 @@
+import { notFoundJson, ownedEvent } from "@/lib/access";
+import { withUser } from "@/lib/auth/core";
 import { failResponse } from "@/lib/ai/http";
 import { languageFromBody } from "@/lib/ai/languages";
 import { aiService } from "@/lib/ai/service";
@@ -11,12 +13,13 @@ const MAX_BODY_BYTES = 1024;
  * OpenAI TTS, else 503 — the client then uses the browser's speechSynthesis. `{ "language": "es" }`
  * speaks the stored translation (409 if it hasn't been made yet) with a multilingual voice.
  */
-export const POST = sameOriginOnly(async (request: Request, ctx: RouteContext<"/api/events/[id]/tts">) => {
+export const POST = sameOriginOnly(withUser(async (request, user, ctx: RouteContext<"/api/events/[id]/tts">) => {
   const { id } = await ctx.params;
   const body = await readBodyText(request, MAX_BODY_BYTES);
   if (!body.ok) return body.response;
   const lang = languageFromBody(body.value);
   if (!lang.ok) return Response.json({ error: lang.error }, { status: 400 });
+  if (!(await ownedEvent(user, id))) return notFoundJson("moment");
   try {
     const res = await aiService(request.headers).speak(id, lang.language);
     if (!res.ok) return failResponse(res);
@@ -32,4 +35,4 @@ export const POST = sameOriginOnly(async (request: Request, ctx: RouteContext<"/
     console.error(`tts failed for ${id}`, err instanceof Error ? err.message : err);
     return Response.json({ error: "Couldn’t make the audio." }, { status: 500 });
   }
-});
+}));

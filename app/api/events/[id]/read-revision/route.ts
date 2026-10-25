@@ -1,3 +1,5 @@
+import { notFoundJson, ownedEvent } from "@/lib/access";
+import { withUser } from "@/lib/auth/core";
 import { MAX_PNG_BYTES, parsePngDataUrl } from "@/lib/ai/dataUrl";
 import { failResponse } from "@/lib/ai/http";
 import { aiService } from "@/lib/ai/service";
@@ -11,7 +13,7 @@ const MAX_BODY_BYTES = Math.ceil((MAX_PNG_BYTES * 4) / 3) * 2 + 4096;
  * review page) with a vision model: what changed and the likely misconception. Stored on the
  * revision; a "cosmetic" reading takes the moment off the timeline on the next analysis.
  */
-export const POST = sameOriginOnly(async (request: Request, ctx: RouteContext<"/api/events/[id]/read-revision">) => {
+export const POST = sameOriginOnly(withUser(async (request, user, ctx: RouteContext<"/api/events/[id]/read-revision">) => {
   const { id } = await ctx.params;
   const read = await readJsonBody(request, MAX_BODY_BYTES);
   if (!read.ok) return read.response;
@@ -23,6 +25,7 @@ export const POST = sameOriginOnly(async (request: Request, ctx: RouteContext<"/
   if (!before.ok) return Response.json({ error: `beforePng: ${before.error}` }, { status: before.status });
   const after = parsePngDataUrl(body.afterPng);
   if (!after.ok) return Response.json({ error: `afterPng: ${after.error}` }, { status: after.status });
+  if (!(await ownedEvent(user, id))) return notFoundJson("moment");
   try {
     const res = await aiService(request.headers).readRevision(id, { beforePng: before.dataUrl, afterPng: after.dataUrl });
     if (!res.ok) return failResponse(res);
@@ -31,4 +34,4 @@ export const POST = sameOriginOnly(async (request: Request, ctx: RouteContext<"/
     console.error(`read-revision failed for ${id}`, err instanceof Error ? err.message : err);
     return Response.json({ error: "Couldn’t read this revision." }, { status: 500 });
   }
-});
+}));

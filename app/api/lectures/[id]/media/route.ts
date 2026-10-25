@@ -1,18 +1,20 @@
 import { createReadStream } from "node:fs";
 import { stat } from "node:fs/promises";
 import { Readable } from "node:stream";
-import { getLecture } from "@/lib/lecture";
+import { visibleLecture } from "@/lib/access";
+import { withUser } from "@/lib/auth/core";
 import { parseRange } from "@/lib/range";
 import { resolveMediaPath } from "@/lib/storage";
+import type { User } from "@/lib/types";
 
 /**
  * Streams a lecture's media with HTTP Range support (206 / Content-Range / Accept-Ranges), which
  * seeking needs everywhere and iPad Safari needs to play at all. The demo lecture is served here
- * too, so every lecture takes the same path.
+ * too, so every lecture takes the same path. Only lectures the signed-in user may open (else 404).
  */
-async function serve(request: Request, ctx: RouteContext<"/api/lectures/[id]/media">, withBody: boolean) {
+async function serve(request: Request, user: User, ctx: RouteContext<"/api/lectures/[id]/media">, withBody: boolean) {
   const { id } = await ctx.params;
-  const record = await getLecture(id);
+  const record = await visibleLecture(user, id);
   const abs = record ? resolveMediaPath(record.mediaPath) : null;
   if (!record || !abs) return Response.json({ error: "lecture not found" }, { status: 404 });
 
@@ -59,10 +61,6 @@ async function serve(request: Request, ctx: RouteContext<"/api/lectures/[id]/med
   return new Response(body, { status, headers });
 }
 
-export function GET(request: Request, ctx: RouteContext<"/api/lectures/[id]/media">) {
-  return serve(request, ctx, true);
-}
+export const GET = withUser((request, user, ctx: RouteContext<"/api/lectures/[id]/media">) => serve(request, user, ctx, true));
 
-export function HEAD(request: Request, ctx: RouteContext<"/api/lectures/[id]/media">) {
-  return serve(request, ctx, false);
-}
+export const HEAD = withUser((request, user, ctx: RouteContext<"/api/lectures/[id]/media">) => serve(request, user, ctx, false));

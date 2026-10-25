@@ -175,7 +175,7 @@ export function pickRecordingMime(isSupported: (mime: string) => boolean): strin
 
 // ── DEMO_MODE ───────────────────────────────────────────────────────────────────────────────────
 
-export const LIVE_DEMO_MESSAGE = 'Live lecture is available when you run Inkling yourself.';
+export const LIVE_DEMO_MESSAGE = 'Live lecture is available when you run TraceIt yourself.';
 
 /** DEMO_MODE (a public demo) never records audio or creates Live lectures. */
 export function liveLectureDisabled(env: Record<string, string | undefined>): boolean {

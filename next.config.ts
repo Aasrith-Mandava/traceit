@@ -16,9 +16,9 @@ const securityHeaders = [
 // One site: the marketing page at /welcome (app/(marketing)) and the app at /app, /session/…,
 // /review/… (app/(product)), each with its own root layout. / sends visitors to /welcome.
 const nextConfig: NextConfig = {
-  // Build output folder. `.next` by default; e2e and preview servers pass INKLING_DIST_DIR so a
+  // Build output folder. `.next` by default; e2e and preview servers pass TRACEIT_DIST_DIR so a
   // second `next dev` can run next to the everyday one (Next locks `<distDir>/dev` per server).
-  distDir: process.env.INKLING_DIST_DIR || ".next",
+  distDir: process.env.TRACEIT_DIST_DIR || process.env.INKLING_DIST_DIR || ".next",
   // Loaded with Node's require instead of bundled: better-sqlite3 is a native addon, pg (Tiger Data
   // / Postgres driver) is on Next's default list anyway, and PGlite ships WASM + data files that
   // must be read from node_modules (DATABASE_URL=pglite:… local runs only; see lib/dbPostgres).
@@ -29,8 +29,12 @@ const nextConfig: NextConfig = {
   // Two root layouts and no top-level one: unmatched URLs get app/global-not-found.tsx.
   experimental: { globalNotFound: true },
   async redirects() {
-    // Temporary (307): / may become the app's own home later.
-    return [{ source: "/", destination: "/welcome", permanent: false }];
+    // Temporary (307): / may become the app's own home later. /about (the old "How it works" page)
+    // leads to My notes.
+    return [
+      { source: "/", destination: "/welcome", permanent: false },
+      { source: "/about", destination: "/app", permanent: false },
+    ];
   },
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];

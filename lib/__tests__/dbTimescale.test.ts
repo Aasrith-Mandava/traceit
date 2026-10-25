@@ -9,7 +9,7 @@ import { openPostgresDb, pgConnectionOptions, type PostgresDb } from '../dbPostg
 // timescale/timescaledb container). Skipped unless TIMESCALE_TEST_URL is set, e.g.
 //   TIMESCALE_TEST_URL='postgres://tsdbadmin:…@….tsdb.cloud.timescale.com:…/tsdb?sslmode=require' \
 //     npx vitest run --project unit lib/__tests__/dbTimescale.test.ts
-// It creates Inkling's tables in that database (use a throwaway service) and namespaces its rows
+// It creates TraceIt's tables in that database (use a throwaway service) and namespaces its rows
 // with a random run id, so it can be re-run against the same database.
 const url = process.env.TIMESCALE_TEST_URL;
 const run = randomUUID().slice(0, 8);

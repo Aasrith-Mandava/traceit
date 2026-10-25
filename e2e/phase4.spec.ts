@@ -82,7 +82,7 @@ test("upload a lecture with captions via the form → it appears in the home pic
   const picker = page.getByTestId("lecture-picker");
   await expect(picker).toHaveValue(lectureId);
   await expect(picker.locator("option:checked")).toHaveText("Related rates — e2e upload");
-  await expect(page.getByTestId("lecture-meta")).toHaveText("00:40 · Audio · transcript");
+  await expect(page.getByTestId("lecture-meta")).toHaveText("00:40 · audio + captions");
   // The demo lecture is still offered first.
   await expect(picker.locator("option").first()).toHaveText(/The Chain Rule \(demo\)/);
 
@@ -125,7 +125,7 @@ test("transcript panel follows playback, and clicking a later word seeks the lec
   await expect(page.getByTestId("transcript-current")).toHaveCount(1);
   await page.screenshot({ path: "screenshots/phase4-transcript.png", animations: "disabled" });
 
-  // Scrolling the transcript by hand pauses auto-follow; "Follow lecture" resumes it.
+  // Scrolling the transcript by hand pauses auto-follow; "Follow along" resumes it.
   await panel.locator(".transcript").hover();
   await page.mouse.wheel(0, 200);
   await expect(page.getByTestId("transcript-follow")).toBeVisible();
@@ -252,23 +252,25 @@ test.describe("lecture API", () => {
   });
 });
 
-test("review: click a moment → Replay 20s plays the evidence and stops at its end", async ({ page, request }) => {
+test("review: the moment → Play this part plays the 20 s of evidence and stops at its end", async ({ page, request }) => {
   const lecture = await uploadLecture(request, "Replay — e2e");
   const sessionId = await seededSession(request, lecture.id, "Replay notes");
 
   await page.goto(`/review/${sessionId}`);
   await expect(page.getByTestId("timeline")).toHaveAttribute("data-status", "ready");
-  await expect(page.getByText("Review · Replay — e2e")).toBeVisible();
+  await expect(page.getByText("Study mode · Replay — e2e")).toBeVisible();
   const marker = page.locator('[data-testid="timeline-marker"][data-type="misconception_corrected"]');
   await expect(marker).toHaveCount(1);
-  await marker.click();
+  // The session's only moment opens by itself.
+  await expect(marker).toHaveAttribute("aria-pressed", "true");
   const detail = page.getByTestId("moment-detail");
-  await expect(detail).toBeVisible();
+  await expect(detail).toHaveAttribute("data-type", "misconception_corrected");
   await expect(page.getByTestId("moment-time")).toHaveText("00:20");
   await expect(page.getByTestId("moment-excerpt")).toContainText("Differentiate both sides with respect to time.");
 
   const replay = page.getByTestId("replay");
-  await expect(replay).toHaveText("Replay 20s");
+  await expect(replay).toHaveText("Play this part");
+  await expect(replay).toHaveAccessibleName("Play this part, 00:10 to 00:30");
   await expect(replay).toHaveAttribute("data-replay-state", "idle");
   const started = Date.now();
   await replay.click();
@@ -286,7 +288,7 @@ test("review: click a moment → Replay 20s plays the evidence and stops at its 
   const endMs = await mediaTimeMs(page);
   expect(Math.abs(endMs - 30_000)).toBeLessThan(400);
   expect(await page.getByTestId("lecture-media").evaluate((el) => (el as HTMLMediaElement).paused)).toBe(true);
-  await expect(replay).toHaveText("Replay again");
+  await expect(replay).toHaveText("Play again");
 
   // Replay again, then stop it early.
   await replay.click();
@@ -305,13 +307,13 @@ test("a lecture without captions works end to end and says it has no transcript"
   await page.getByTestId("upload-submit").click();
   await page.waitForURL(/\/app\?lecture=/);
   const lectureId = new URL(page.url()).searchParams.get("lecture")!;
-  await expect(page.getByTestId("lecture-meta")).toHaveText("00:40 · Audio · no transcript");
+  await expect(page.getByTestId("lecture-meta")).toHaveText("00:40 · audio · no captions");
 
   // Capture: the transcript panel explains, and auto-transcribe needs a key.
   await page.getByTestId("new-session").click();
   await page.waitForURL(/\/session\/[^/]+$/);
   await page.getByTestId("transcript-toggle").click();
-  await expect(page.getByTestId("transcript-empty")).toContainText("No transcript for this lecture");
+  await expect(page.getByTestId("transcript-empty")).toContainText("No captions for this lecture yet");
   await expect(page.getByTestId("transcribe-note")).toHaveText("Auto-transcribe needs an OpenAI or Groq key");
 
   await page.getByTestId("play-toggle").click();
@@ -330,7 +332,9 @@ test("a lecture without captions works end to end and says it has no transcript"
   // A moment on this lecture: the evidence says there is no transcript, replay still works.
   const sessionId = await seededSession(request, lectureId, "No-caption notes");
   await page.goto(`/review/${sessionId}`);
-  await page.locator('[data-testid="timeline-marker"]').first().click();
+  // Its only moment (a correction) opens by itself.
+  await expect(page.locator('[data-testid="timeline-marker"]')).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByTestId("moment-detail")).toHaveAttribute("data-type", "misconception_corrected");
   await expect(page.getByTestId("moment-excerpt")).toHaveText("No transcript for this lecture");
   await page.getByTestId("replay").click();
   await expect(page.getByTestId("replay")).toHaveAttribute("data-replay-state", "playing");
@@ -378,7 +382,7 @@ test("video lecture: compact video panel collapses without interrupting playback
   await expect(page.getByTestId("media-info")).toHaveText(/^Video · .+ · 00:0[234]$/);
   await page.getByTestId("upload-submit").click();
   await page.waitForURL(/\/app\?lecture=/);
-  await expect(page.getByTestId("lecture-meta")).toHaveText(/Video · no transcript$/);
+  await expect(page.getByTestId("lecture-meta")).toHaveText(/video · no captions$/);
   await page.getByTestId("new-session").click();
   await page.waitForURL(/\/session\/[^/]+$/);
 

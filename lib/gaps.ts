@@ -4,7 +4,7 @@ import "server-only";
 // ./progress (revisit resolution, repeats, self actions) and shapes the progress payloads.
 import { applyCheckAnswer } from "./classify";
 import { createConceptTagger, withConceptLabels, type ConceptTagger } from "./concepts";
-import { LOCAL_STUDENT_ID, getDb, type Db } from "./db";
+import { getDb, type Db } from "./db";
 import { toClientEvent, toClientEvents } from "./events";
 import { activeStrokes } from "./ink";
 import { getSessionLecture } from "./lecture";
@@ -30,8 +30,8 @@ import type { Session, TimelineEvent, TranscriptWord } from "./types";
 // (analysis, reconciliation, "I get it now", check answers). Those sequences are serialised per
 // (student, lecture) so a stale snapshot can never overwrite a newer write. Singleton across Next
 // dev hot reloads, like the DB handle.
-const g = globalThis as unknown as { __inklingLectureLock?: ReturnType<typeof createKeyedMutex> };
-const lectureLock = (g.__inklingLectureLock ??= createKeyedMutex());
+const g = globalThis as unknown as { __traceitLectureLock?: ReturnType<typeof createKeyedMutex> };
+const lectureLock = (g.__traceitLectureLock ??= createKeyedMutex());
 
 /** Runs `task` while holding the (student, lecture) lock (re-entrant within the holding task; lib/mutex). */
 export function withLectureLock<T>(studentId: string, lectureId: string, task: () => Promise<T>): Promise<T> {
@@ -261,7 +261,7 @@ function toProgressThread(t: GapThread, sessions: Map<string, Session>, tagger: 
 const byLectureTime = (a: ProgressThread, b: ProgressThread) => a.latest.lectureMs - b.latest.lectureMs;
 
 /** Every gap thread of a student, per lecture (most recently studied lecture first). */
-export async function getProgress(studentId: string = LOCAL_STUDENT_ID): Promise<ProgressPayload> {
+export async function getProgress(studentId: string): Promise<ProgressPayload> {
   const db = getDb();
   const [sessions, gaps] = await Promise.all([db.listStudentSessions(studentId), db.listGaps(studentId)]);
   const sessionMap = new Map<string, Session>(sessions.map((s) => [s.id, s]));
@@ -294,7 +294,7 @@ export async function getProgress(studentId: string = LOCAL_STUDENT_ID): Promise
 }
 
 /** Number of open gap threads (the home page's quiet "Open gaps: N"). */
-export async function countOpenGaps(studentId: string = LOCAL_STUDENT_ID): Promise<number> {
+export async function countOpenGaps(studentId: string): Promise<number> {
   const db = getDb();
   const [sessions, gaps] = await Promise.all([db.listStudentSessions(studentId), db.listGaps(studentId)]);
   return buildThreads(gaps, new Map(sessions.map((s) => [s.id, s]))).filter((t) => t.status === "open").length;
@@ -303,15 +303,17 @@ export async function countOpenGaps(studentId: string = LOCAL_STUDENT_ID): Promi
 /**
  * A lecture's gap threads as seen from one session: `open` = open threads from earlier sessions
  * (the capture banner), `carried` = those plus the ones this session resolved (the review's
- * "Carried over"). Without a session: every open thread of the local student.
+ * "Carried over"). Without a session: every open thread of the student.
  */
 export async function getLectureGaps(
   lectureId: string,
-  opts: { sessionId?: string; studentId?: string } = {},
+  opts: { studentId: string; sessionId?: string },
 ): Promise<LectureGapsPayload> {
   const db = getDb();
-  const session = opts.sessionId ? await db.getSession(opts.sessionId) : null;
-  const studentId = session?.studentId ?? opts.studentId ?? LOCAL_STUDENT_ID;
+  const { studentId } = opts;
+  // Only one of this student's own sessions anchors the view (another student's id is ignored).
+  const found = opts.sessionId ? await db.getSession(opts.sessionId) : null;
+  const session = found && found.studentId === studentId ? found : null;
   const [sessions, gaps, { tagger }] = await Promise.all([
     db.listStudentSessions(studentId, lectureId),
     db.listGaps(studentId, lectureId),

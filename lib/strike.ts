@@ -25,6 +25,11 @@ export const STRIKE_CONFIG = {
   maxAngleDeg: 25,
   /** Narrower marks (the stem of a "+", a "1", an "l") can't be struck. */
   minWordWidthPx: 16,
+  /**
+   * Marks much taller than wide aren't words (a graph's y-axis, a divider, a big "+" or "t" drawn
+   * with a mouse), so a horizontal line across them — an x-axis, a crossbar — never strikes them.
+   */
+  maxWordAspect: 1.5,
   /** The line must cross this share of the word's width… */
   minCover: 0.6,
   /** …inside its middle band: the word's height minus this share at the top and at the bottom. */
@@ -68,7 +73,7 @@ export function detectStrikeThrough(line: Stroke, earlier: Stroke[], cfg = STRIK
     if (s.id === line.id || s.erased || s.isScribble) continue;
     const [bx0, by0, bx1, by1] = s.bbox;
     const width = bx1 - bx0;
-    if (width < cfg.minWordWidthPx) continue;
+    if (width < cfg.minWordWidthPx || by1 - by0 > cfg.maxWordAspect * width) continue;
     const from = Math.max(left, bx0);
     const to = Math.min(right, bx1);
     if (to - from < cfg.minCover * width) continue;

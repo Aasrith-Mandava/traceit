@@ -80,7 +80,7 @@ test("a gap follows you: home → progress → next session's banner → calm re
   const thread = section.getByTestId("progress-thread");
   await expect(thread).toHaveCount(1);
   await expect(thread).toHaveAttribute("data-status", "open");
-  await expect(thread).toContainText("Open");
+  await expect(thread).toContainText("Still fuzzy");
   await expect(thread).toContainText("03:40");
   await expect(thread.getByTestId("progress-thread-label")).toHaveText(gap.conceptLabel!);
 
@@ -89,7 +89,7 @@ test("a gap follows you: home → progress → next session's banner → calm re
   await page.goto(`/session/${s2}`);
   const banner = page.getByTestId("open-gaps-banner");
   await expect(banner).toBeVisible();
-  await expect(banner).toContainText("You have 1 open gap in this lecture");
+  await expect(banner).toContainText("1 fuzzy spot in this lecture is left over from last time");
   const jump = banner.getByTestId("open-gap-jump");
   await expect(jump).toHaveCount(1);
   await expect(jump).toContainText(gap.conceptLabel!);
@@ -115,8 +115,8 @@ test("a gap follows you: home → progress → next session's banner → calm re
   const item = carried.getByTestId("carried-over-item");
   await expect(item).toHaveCount(1);
   await expect(item).toHaveAttribute("data-state", "resolved");
-  await expect(item).toContainText("Resolved this session");
-  await expect(carried).toContainText("1 resolved this session");
+  await expect(item).toContainText("Cleared this session");
+  await expect(carried).toContainText("1 cleared this session");
   await page.screenshot({ path: "screenshots/phase6-carried.png", animations: "disabled" });
 
   await page.goto("/progress?status=resolved");
@@ -137,7 +137,7 @@ test("a gap follows you: home → progress → next session's banner → calm re
   await page.waitForURL(new RegExp(`/review/${s1}\\?moment=`));
   const detail = page.getByTestId("moment-detail");
   await expect(detail).toHaveAttribute("data-event-id", gap.id);
-  await expect(page.getByTestId("moment-status")).toHaveText("Resolved");
+  await expect(page.getByTestId("moment-status")).toHaveText("Cleared");
   await expect(page.getByTestId("moment-concept")).toContainText(gap.conceptLabel!);
   await expect(page.getByTestId("moment-history")).toContainText(/First seen \w+ \d+ · resolved \w+ \d+ by writing through it calmly/);
   await expect(page.getByTestId("self-reopen")).toBeVisible();
@@ -161,7 +161,7 @@ test("a repeat gap keeps it open and says 2nd time", async ({ page, request }) =
   // Review of session 2: the moment says it's the 2nd time; the earlier one "came up again".
   await page.goto(`/review/${s2}?moment=${encodeURIComponent(g2.id)}`);
   await expect(page.getByTestId("moment-detail")).toHaveAttribute("data-event-id", g2.id);
-  await expect(page.getByTestId("moment-status")).toHaveText("Open");
+  await expect(page.getByTestId("moment-status")).toHaveText("Still fuzzy");
   await expect(page.getByTestId("moment-history")).toHaveText(/^Open since \w+ \d+ · 2nd time$/);
   const item = page.getByTestId("carried-over-item");
   await expect(item).toHaveAttribute("data-state", "repeated");
@@ -180,7 +180,7 @@ test("a repeat gap keeps it open and says 2nd time", async ({ page, request }) =
   // Session 3's banner still counts one gap (the thread), marked ×2.
   const s3 = await seedSession(request, lecture.id, "Repeat — third", (id) => buildCalmScenario(id, { fromMs: 1000, toMs: 60_000 }));
   await page.goto(`/session/${s3}`);
-  await expect(page.getByTestId("open-gaps-banner")).toContainText("You have 1 open gap in this lecture");
+  await expect(page.getByTestId("open-gaps-banner")).toContainText("1 fuzzy spot in this lecture is left over from last time");
   await expect(page.getByTestId("open-gap-jump")).toContainText("×2");
 
   // A progress screenshot with both open and resolved gaps across lectures.
@@ -194,13 +194,15 @@ test('"I get it now" persists after reload, and "Still confused" reopens it', as
   const gap = (await analyze(request, s1)).events[0];
 
   await page.goto(`/review/${s1}`);
-  await page.locator('[data-testid="timeline-marker"][data-type="unresolved_gap"]').click();
-  await expect(page.getByTestId("moment-status")).toHaveText("Open");
+  // The session's only moment opens by itself.
+  await expect(page.getByTestId("moment-detail")).toHaveAttribute("data-event-id", gap.id);
+  await expect(page.locator('[data-testid="timeline-marker"][data-type="unresolved_gap"]')).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByTestId("moment-status")).toHaveText("Still fuzzy");
   await expect(page.getByTestId("moment-history")).toHaveText(/^Open since \w+ \d+$/);
   await expect(page.getByTestId("moment-concept")).toContainText(gap.conceptLabel!);
   await page.screenshot({ path: "screenshots/phase6-moment.png", animations: "disabled" });
   await page.getByTestId("self-resolve").click();
-  await expect(page.getByTestId("moment-status")).toHaveText("Resolved");
+  await expect(page.getByTestId("moment-status")).toHaveText("Cleared");
   await expect(page.getByTestId("moment-history")).toContainText("you said you get it");
   await expect(page.locator('[data-testid="timeline-marker"][data-type="unresolved_gap"]')).toHaveAttribute(
     "data-status",
@@ -208,17 +210,17 @@ test('"I get it now" persists after reload, and "Still confused" reopens it', as
   );
 
   await page.reload();
-  await page.locator('[data-testid="timeline-marker"][data-type="unresolved_gap"]').click();
-  await expect(page.getByTestId("moment-status")).toHaveText("Resolved");
+  await expect(page.getByTestId("moment-detail")).toHaveAttribute("data-event-id", gap.id);
+  await expect(page.getByTestId("moment-status")).toHaveText("Cleared");
   expect(
     (await progress(request)).lectures.find((l) => l.lectureId === lecture.id)!.threads[0],
   ).toMatchObject({ status: "resolved", resolvedBy: "self" });
 
   await page.getByTestId("self-reopen").click();
-  await expect(page.getByTestId("moment-status")).toHaveText("Open");
+  await expect(page.getByTestId("moment-status")).toHaveText("Still fuzzy");
   await expect(page.getByTestId("self-resolve")).toBeVisible();
   await page.goto(`/review/${s1}?moment=${encodeURIComponent(gap.id)}`);
-  await expect(page.getByTestId("moment-status")).toHaveText("Open");
+  await expect(page.getByTestId("moment-status")).toHaveText("Still fuzzy");
   expect((await progress(request)).lectures.find((l) => l.lectureId === lecture.id)!.threads[0].status).toBe("open");
 });
 

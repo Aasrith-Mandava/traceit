@@ -1,18 +1,23 @@
 "use client";
 
-// The teacher view's class heatmap: lecture time left → right in 30 s columns, two rows —
-// "students who hesitated or erased" (k-anonymous: fewer than 3 is never shown) and "erased strokes"
-// (the hotspots query; on Tiger Data a TimescaleDB continuous aggregate). One sequential hue,
-// lighter = less, relative to each row's busiest column. Hand-rolled SVG sized to its container,
-// a per-column tooltip on hover and on keyboard focus (arrow keys), and a table view.
+// The class insights heatmap: lecture time left → right in 30 s columns, two rows — "students who
+// hesitated or erased" (k-anonymous: fewer than 3 is never shown) and "erased strokes" (the hotspots
+// query; on Tiger Data a TimescaleDB continuous aggregate). One sequential hue (ink indigo), lighter =
+// less, relative to each row's busiest column; "none" is an empty dashed cell, outside the ramp.
+// Hand-rolled SVG sized to its container, a per-column tooltip on hover and on keyboard focus
+// (arrow keys), and a table view.
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
 import type { ClassBucket, ReteachMoment } from "@/lib/teacher";
 import { formatClock } from "@/lib/time";
 
-/** Sequential teal ramp (the accent), light → dark (Tailwind teal 100–900 steps). */
-const RAMP = ["#ccfbf1", "#99f6e4", "#5eead4", "#14b8a6", "#0f766e", "#134e4a"] as const;
-/** "None / fewer than 3 students": a cool grey, clearly not part of the ramp. */
-const EMPTY = "#eef2f4";
+/**
+ * Sequential ink-indigo ramp (the brand), light → dark: indigo soft, lighter, light, indigo, indigo
+ * hover, ink. The four darkest steps are ≥ 3:1 against the white card (3.2, 7.1, 9.4 and 18:1).
+ */
+const RAMP = ["#eceafe", "#b9b2f5", "#8b80f9", "#4b3bdb", "#3a2cb8", "#16132b"] as const;
+/** "None / fewer than 3 students": a blank cell with a dashed outline, clearly not part of the ramp. */
+const EMPTY = "#ffffff";
+const EMPTY_STROKE = "var(--color-line-strong)";
 
 export const rampColor = (level: number) => (level <= 0 ? EMPTY : RAMP[Math.min(RAMP.length - 1, Math.floor(level * RAMP.length - 1e-9))]);
 
@@ -31,6 +36,26 @@ function tickStep(durationMs: number, width: number): number {
     if (durationMs / step <= maxTicks) return step;
   }
   return 3_600_000;
+}
+
+/** One heatmap cell: a ramp step, or a blank dashed cell for "none / fewer than 3". */
+function Cell({ x, y, w, level }: { x: number; y: number; w: number; level: number }) {
+  const rx = Math.min(4, w / 3);
+  return level <= 0 ? (
+    <rect
+      x={x + 0.5}
+      y={y + 0.5}
+      width={Math.max(0, w - 1)}
+      height={ROW_H - 1}
+      rx={rx}
+      fill={EMPTY}
+      stroke={EMPTY_STROKE}
+      strokeWidth={1}
+      strokeDasharray="3 2"
+    />
+  ) : (
+    <rect x={x} y={y} width={w} height={ROW_H} rx={rx} fill={rampColor(level)} />
+  );
 }
 
 export default function TeacherHeatmap({
@@ -108,14 +133,15 @@ export default function TeacherHeatmap({
       data-columns={buckets.length}
       data-timescale={timescale ? "true" : "false"}
       aria-labelledby={titleId}
-      className="flex flex-col gap-3 panel px-4 pt-4 pb-3 sm:px-5"
+      className="panel flex flex-col gap-4 px-4 pt-5 pb-4 sm:px-[22px]"
     >
-      <figcaption className="flex flex-col gap-0.5">
-        <span id={titleId} className="text-sm font-semibold text-ink">
-          Class heatmap over lecture time
+      <figcaption className="flex flex-col gap-1">
+        <span id={titleId} className="font-display text-lg leading-tight font-bold tracking-[-0.01em] text-ink">
+          When the whole room slowed down
         </span>
-        <span className="text-xs text-pretty text-ink-subtle">
-          Each column is 30 seconds of the lecture. Darker = more of the class, relative to the busiest moment.
+        <span className="text-[13px] text-pretty text-ink-subtle">
+          The class heatmap: each column is 30 seconds of the lecture. Darker = more of the class, relative to the busiest
+          moment.
           {onPlayFrom ? " Click a column to hear it." : null}
         </span>
       </figcaption>
@@ -148,19 +174,19 @@ export default function TeacherHeatmap({
             const cx = (x0 + x1) / 2;
             return (
               <g key={m.rank} data-testid="heatmap-moment-marker">
-                <line x1={x0 + GAP} x2={x1 - GAP} y1={MARK_H - 2} y2={MARK_H - 2} stroke="var(--color-ink)" strokeWidth={2} strokeLinecap="round" />
-                <circle cx={cx} cy={MARK_H - 11} r={7} fill="var(--color-ink)" />
-                <text x={cx} y={MARK_H - 7.5} textAnchor="middle" fontSize={10} fontWeight={700} fill="var(--color-paper)">
+                <line x1={x0 + GAP} x2={x1 - GAP} y1={MARK_H - 2} y2={MARK_H - 2} stroke="var(--color-night)" strokeWidth={2} strokeLinecap="round" />
+                <circle cx={cx} cy={MARK_H - 11} r={7.5} fill="var(--color-night)" />
+                <text x={cx} y={MARK_H - 7.5} textAnchor="middle" fontSize={10} fontWeight={800} fill="var(--color-highlight)">
                   {m.rank}
                 </text>
               </g>
             );
           })}
 
-          <text x={0} y={rowY[0] - 6} fontSize={11} fontWeight={600} fill="var(--color-ink-muted)">
+          <text x={0} y={rowY[0] - 6} fontSize={11.5} fontWeight={700} fill="var(--color-ink-muted)">
             Students who hesitated or erased
           </text>
-          <text x={0} y={rowY[1] - 6} fontSize={11} fontWeight={600} fill="var(--color-ink-muted)">
+          <text x={0} y={rowY[1] - 6} fontSize={11.5} fontWeight={700} fill="var(--color-ink-muted)">
             Erased strokes
           </text>
 
@@ -170,19 +196,32 @@ export default function TeacherHeatmap({
             const isActive = i === active;
             return (
               <g key={b.startMs} data-testid="heatmap-column" data-start-ms={b.startMs} data-students={b.students ?? ""} data-erased={b.erased}>
-                <rect x={x} y={rowY[0]} width={w} height={ROW_H} rx={Math.min(4, w / 3)} fill={rampColor(b.studentLevel)} />
-                <rect x={x} y={rowY[1]} width={w} height={ROW_H} rx={Math.min(4, w / 3)} fill={rampColor(b.erasedLevel)} />
+                <Cell x={x} y={rowY[0]} w={w} level={b.studentLevel} />
+                <Cell x={x} y={rowY[1]} w={w} level={b.erasedLevel} />
                 {isActive ? (
-                  <rect
-                    x={x - 1}
-                    y={rowY[0] - 1}
-                    width={w + 2}
-                    height={rowY[1] + ROW_H - rowY[0] + 2}
-                    rx={5}
-                    fill="none"
-                    stroke="var(--color-ink)"
-                    strokeWidth={1.5}
-                  />
+                  <>
+                    {/* White halo under the ink outline so it reads against the darkest cells too. */}
+                    <rect
+                      x={x - 1}
+                      y={rowY[0] - 1}
+                      width={w + 2}
+                      height={rowY[1] + ROW_H - rowY[0] + 2}
+                      rx={6}
+                      fill="none"
+                      stroke="var(--color-chrome)"
+                      strokeWidth={3.5}
+                    />
+                    <rect
+                      x={x - 1}
+                      y={rowY[0] - 1}
+                      width={w + 2}
+                      height={rowY[1] + ROW_H - rowY[0] + 2}
+                      rx={6}
+                      fill="none"
+                      stroke="var(--color-ink)"
+                      strokeWidth={1.5}
+                    />
+                  </>
                 ) : null}
                 {/* Hit target: the whole column, gaps included. */}
                 <rect
@@ -205,7 +244,15 @@ export default function TeacherHeatmap({
             return (
               <g key={t}>
                 <line x1={x} x2={x} y1={rowY[1] + ROW_H + 2} y2={rowY[1] + ROW_H + 6} stroke="var(--color-line-strong)" />
-                <text x={x} y={height - 3} textAnchor={anchor} fontSize={11} fill="var(--color-ink-subtle)" style={{ fontVariantNumeric: "tabular-nums" }}>
+                <text
+                  x={x}
+                  y={height - 3}
+                  textAnchor={anchor}
+                  fontSize={11}
+                  fill="var(--color-ink-subtle)"
+                  className="font-mono"
+                  style={{ fontVariantNumeric: "tabular-nums" }}
+                >
                   {formatClock(t)}
                 </text>
               </g>
@@ -218,7 +265,7 @@ export default function TeacherHeatmap({
             id={tipId}
             role="status"
             data-testid="heatmap-tooltip"
-            className="pointer-events-none absolute top-full z-10 mt-1.5 w-max max-w-[220px] -translate-x-1/2 rounded-md border border-line bg-chrome px-2.5 py-1.5 text-xs shadow-raised"
+            className="pointer-events-none absolute top-full z-10 mt-1.5 flex w-max max-w-[230px] -translate-x-1/2 flex-col gap-0.5 rounded-[12px] border border-line bg-chrome px-3 py-2 text-xs shadow-lift"
             style={{ left: tipLeft }}
           >
             <span className="block font-mono text-[11px] text-ink-subtle tabular-nums">{range(shown)}</span>
@@ -234,9 +281,9 @@ export default function TeacherHeatmap({
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 text-xs text-ink-subtle">
-        <span className="flex items-center gap-2" aria-hidden="true">
+        <span className="flex flex-wrap items-center gap-x-3 gap-y-1.5" aria-hidden="true">
           <span className="inline-flex items-center gap-1.5">
-            <span className="inline-block size-3 rounded-[3px]" style={{ background: EMPTY }} />
+            <span className="inline-block size-3 rounded-[3px] border border-dashed border-line-strong" style={{ background: EMPTY }} />
             none or fewer than 3
           </span>
           <span className="inline-flex items-center gap-1">
@@ -256,18 +303,18 @@ export default function TeacherHeatmap({
       </div>
 
       <details className="group text-sm">
-        <summary className="inline-flex min-h-11 cursor-pointer items-center gap-1 rounded-pill px-2 -mx-2 font-medium text-accent hover:bg-accent-soft">
+        <summary className="press -mx-3 inline-flex min-h-11 cursor-pointer items-center gap-1 rounded-md px-3 font-bold text-accent hover:bg-accent-soft hover:text-accent-press">
           Show as a table
         </summary>
         <div className="mt-2 max-h-72 overflow-auto rounded-md border border-line">
           <table data-testid="heatmap-table" className="w-full text-left text-sm tabular-nums">
             <caption className="sr-only">Class activity per 30 seconds of the lecture</caption>
-            <thead className="sticky top-0 bg-desk text-xs text-ink-subtle">
+            <thead className="sticky top-0 bg-chrome-hover text-xs text-ink-subtle">
               <tr>
-                <th scope="col" className="px-3 py-2 font-medium">Lecture time</th>
-                <th scope="col" className="px-3 py-2 font-medium">Students who hesitated or erased</th>
-                <th scope="col" className="px-3 py-2 font-medium">Erased strokes</th>
-                <th scope="col" className="px-3 py-2 font-medium">All strokes</th>
+                <th scope="col" className="px-3 py-2 font-bold">Lecture time</th>
+                <th scope="col" className="px-3 py-2 font-bold">Students who hesitated or erased</th>
+                <th scope="col" className="px-3 py-2 font-bold">Erased strokes</th>
+                <th scope="col" className="px-3 py-2 font-bold">All strokes</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-line">

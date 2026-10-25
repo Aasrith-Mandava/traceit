@@ -1,5 +1,6 @@
-// "How Inkling decides you were stuck": the scoring rules behind the Signal Lab chart in plain
-// language, with the live numbers from lib/scoring's SCORING_CONFIG.
+// "How TraceIt decides you were stuck": the scoring rules behind the "See the details" chart in
+// plain language, with the live numbers from lib/scoring's SCORING_CONFIG. Numbered lime steps, then
+// the four signals and their weights.
 import { FEATURES } from "@/lib/insights";
 import { SCORING_CONFIG } from "@/lib/scoring";
 
@@ -26,31 +27,36 @@ export default function SignalLegend() {
     },
   ];
   return (
-    <section aria-labelledby="how-heading" data-testid="signal-legend" className="flex flex-col gap-3">
-      <h3 id="how-heading" className="eyebrow">
-        How Inkling decides you were stuck
-      </h3>
-      <ol className="grid gap-2 sm:grid-cols-2">
+    <section aria-labelledby="how-heading" data-testid="signal-legend" className="flex flex-col gap-4">
+      <h2 id="how-heading" className="px-1 text-[26px] leading-tight font-bold text-ink">
+        How TraceIt decides you were stuck
+      </h2>
+      <ol className="grid gap-3.5 sm:grid-cols-2">
         {steps.map((s, i) => (
-          <li key={s.title} className="flex gap-3 panel rounded-lg px-4 py-3">
-            <span aria-hidden="true" className="mt-px font-mono text-sm tabular-nums text-ink-subtle">
+          <li key={s.title} className="panel flex gap-3.5 px-5 py-4">
+            <span
+              aria-hidden="true"
+              className="inline-flex size-8 shrink-0 items-center justify-center rounded-pill bg-highlight font-mono text-sm font-medium text-on-highlight tabular-nums"
+            >
               {i + 1}
             </span>
-            <span className="flex min-w-0 flex-col gap-0.5">
-              <span className="text-sm font-medium text-ink">{s.title}</span>
-              <span className="text-sm text-pretty text-ink-muted">{s.body}</span>
+            <span className="flex min-w-0 flex-col gap-1">
+              <span className="text-[15px] font-bold text-ink">{s.title}</span>
+              <span className="text-sm leading-relaxed text-pretty text-ink-muted">{s.body}</span>
             </span>
           </li>
         ))}
       </ol>
       <dl className="panel divide-y divide-line overflow-hidden">
         {FEATURES.map((f) => (
-          <div key={f.key} className="grid gap-x-6 gap-y-0.5 px-4 py-2.5 sm:grid-cols-[9rem_1fr]">
-            <dt className="flex items-baseline justify-between gap-2 text-sm font-medium text-ink sm:justify-start">
+          <div key={f.key} className="grid gap-x-6 gap-y-1 px-5 py-3 sm:grid-cols-[10rem_1fr]">
+            <dt className="flex items-baseline justify-between gap-2 text-[15px] font-bold text-ink sm:justify-start">
               {f.label}
-              <span className="font-mono text-xs tabular-nums text-ink-subtle">{pct(f.weight)}</span>
+              <span className="rounded-pill bg-accent-soft px-2 py-px font-mono text-xs font-medium text-accent-strong tabular-nums">
+                {pct(f.weight)}
+              </span>
             </dt>
-            <dd className="text-sm text-pretty text-ink-muted">{f.explain}</dd>
+            <dd className="text-sm leading-relaxed text-pretty text-ink-muted">{f.explain}</dd>
           </div>
         ))}
       </dl>

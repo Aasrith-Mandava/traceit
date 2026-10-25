@@ -1,3 +1,5 @@
+import { notFoundJson, ownedEvent } from "@/lib/access";
+import { withUser } from "@/lib/auth/core";
 import { parseLanguage } from "@/lib/ai/languages";
 import { aiService } from "@/lib/ai/service";
 import { answerCheckQuestion } from "@/lib/gaps";
@@ -12,7 +14,7 @@ const MAX_BODY_BYTES = 256;
  * reconciliation runs in the same step. Responds with the stored moment and every changed event.
  * With a `language`, "why" comes from the translated card the student answered (when there is one).
  */
-export const POST = sameOriginOnly(async (request: Request, ctx: RouteContext<"/api/events/[id]/check">) => {
+export const POST = sameOriginOnly(withUser(async (request, user, ctx: RouteContext<"/api/events/[id]/check">) => {
   const { id } = await ctx.params;
   const read = await readJsonBody(request, MAX_BODY_BYTES);
   if (!read.ok) return read.response;
@@ -24,6 +26,7 @@ export const POST = sameOriginOnly(async (request: Request, ctx: RouteContext<"/
   }
   const language = fields.language === undefined ? "en" : parseLanguage(fields.language);
   if (!language) return Response.json({ error: "language is not supported" }, { status: 400 });
+  if (!(await ownedEvent(user, id))) return notFoundJson("moment");
   try {
     const result = await answerCheckQuestion(id, choiceIdx);
     if (!result.ok) return Response.json({ error: result.error }, { status: result.status });
@@ -40,4 +43,4 @@ export const POST = sameOriginOnly(async (request: Request, ctx: RouteContext<"/
     console.error(`check failed for ${id}`, err instanceof Error ? err.message : err);
     return Response.json({ error: "Couldn’t save your answer." }, { status: 500 });
   }
-});
+}));

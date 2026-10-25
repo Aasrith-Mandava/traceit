@@ -9,19 +9,20 @@ export default function AppError({ reset }: { error: Error & { digest?: string }
   return (
     <StatusScreen
       eyebrow="Something went wrong"
+      scribble="oops"
       title={
         <>
-          That page didn’t <Mark>load</Mark>
+          Well, that got <Mark>messy.</Mark>
         </>
       }
-      lede="Nothing you wrote is lost — ink is saved as you go. Try again, or head back to your sessions."
+      lede="Nothing you wrote is lost: your ink saves as you go. Try again, or head back to your notes."
       actions={
         <>
           <button type="button" onClick={reset} className={btnPrimary}>
             Try again
           </button>
           <Link href="/app" className={btnSecondary}>
-            Your sessions
+            Back to my notes
           </Link>
         </>
       }

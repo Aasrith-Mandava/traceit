@@ -28,7 +28,7 @@ async function storedCase(fallback: EvalCase): Promise<EvalCase> {
       source: "stored",
     };
   } catch (err) {
-    console.error(`[inkling] evaluation: using the scenario for ${fallback.sessionId}: ${err instanceof Error ? err.message : String(err)}`);
+    console.error(`[traceit] evaluation: using the scenario for ${fallback.sessionId}: ${err instanceof Error ? err.message : String(err)}`);
     return fallback;
   }
 }

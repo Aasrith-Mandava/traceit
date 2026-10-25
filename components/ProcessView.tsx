@@ -31,7 +31,7 @@ interface ProcessViewProps {
 }
 
 /**
- * "Inkling — the process": the session's page scaled to fit, with ghost ink always on and every
+ * "TraceIt — the process": the session's page scaled to fit, with ghost ink always on and every
  * learning moment pinned where it happened on the page. A marker opens that moment in the review.
  */
 export default function ProcessView({ sessionId, strokes, events, revisions, visibleUntil = 1, className = "" }: ProcessViewProps) {
@@ -91,7 +91,7 @@ export default function ProcessView({ sessionId, strokes, events, revisions, vis
   return (
     <div
       ref={wrapRef}
-      data-testid="inkling-process"
+      data-testid="traceit-process"
       data-ghost="on"
       data-erased-count={erased}
       data-marker-count={markers.length}
@@ -125,12 +125,12 @@ export default function ProcessView({ sessionId, strokes, events, revisions, vis
                   data-testid="process-marker"
                   data-event-id={event.id}
                   data-type={event.type}
-                  aria-label={`${momentAriaLabel(event)} — open in review`}
-                  title={`${MOMENT_META[event.type].label} — open in review`}
+                  aria-label={`${momentAriaLabel(event)} — open in study mode`}
+                  title={`${MOMENT_META[event.type].label} — open in study mode`}
                   tabIndex={hidden ? -1 : undefined}
                   className="group absolute inline-flex size-11 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-pill"
                 >
-                  <span className="inline-flex size-6 items-center justify-center rounded-pill bg-chrome shadow-[0_0_0_1px_rgb(15_23_42/0.12),0_2px_6px_-1px_rgb(15_23_42/0.25)] transition-transform duration-150 ease-out group-hover:scale-110 group-active:scale-95">
+                  <span className="inline-flex size-7 items-center justify-center rounded-pill bg-chrome shadow-[0_0_0_1.5px_var(--color-line-strong),0_6px_14px_-6px_rgb(22_19_43/0.45)] transition-transform duration-150 ease-out group-hover:scale-110 group-active:scale-95">
                     <MomentGlyph type={event.type} size={16} />
                   </span>
                 </Link>

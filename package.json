@@ -1,5 +1,5 @@
 {
-  "name": "inkling",
+  "name": "traceit",
   "version": "0.1.0",
   "private": true,
   "engines": {
@@ -17,7 +17,6 @@
     "demo": "node scripts/demo.mjs"
   },
   "dependencies": {
-    "@paper-design/shaders-react": "0.0.81",
     "better-sqlite3": "^13.0.3",
     "clsx": "^2.1.1",
     "framer-motion": "13.4.4",

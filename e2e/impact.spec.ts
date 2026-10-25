@@ -10,7 +10,7 @@ import { captionsFromWords } from "./fixtures/phase6-scenario";
 // order, so the right answer is still found by its English text. No server voice in tests, so
 // Read aloud / the recap speak with the browser voice — stubbed here to record what was spoken.
 //
-// Runs in the "ai" Playwright project (AI on; no `x-inkling-ai: off` header).
+// Runs in the "ai" Playwright project (AI on; no `x-traceit-ai: off` header).
 test.use({ viewport: { width: 1180, height: 820 } });
 
 const RIGHT = "Multiply by the derivative of the inside";

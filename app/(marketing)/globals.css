@@ -1,274 +1,367 @@
 @import "tailwindcss";
 
 /*
- * Inkling landing — light, paper-like theme (Notability-style): off-white paper, white cards with
- * hairline borders and soft shadows, near-black ink, teal as the one accent. The token names are
- * the app's (desk, chrome, paper, ink, accent, ghost…) so shared pieces like the handwriting card
- * keep working.
+ * TraceIt landing (/welcome) — the "Highlighter" system, the same tokens as the app
+ * (app/(product)/globals.css; names and values kept in step so shared pieces read as one product):
+ * a soft lavender desk, white cards with hairline borders, deep-ink text, ink indigo as the brand,
+ * and a lime highlighter for whatever matters most. Dark bands (the "idea" band) use the night ink.
  *
- * One continuous background: a fixed pearl LiquidMetal (components/PageBackground) under a 35%
- * white veil, behind every section. html paints the paper colour underneath; body and sections
- * stay transparent; content sits in translucent white panels (.card, .panel).
+ * Moments are shape + colour coded: Fixed ● green, Still fuzzy ○ orange, Aha moment ◆ pink.
+ * Ghost ink is your own ink, faded: a light-indigo outline.
  *
- * Contrast (WCAG AA): ink #0f172a, ink-muted #475569 and ink-subtle #526176 pass 4.5:1 on white,
- * on the panels and on the most tinted spot of the veiled background (≈ #e2f3f0); teal text
- * uses #0f766e (5.5:1 on white).
+ * No WebGL: every surface is plain CSS, so the page is light on battery and identical with or
+ * without motion.
+ *
+ * Contrast (WCAG AA on white and on the desk): ink #16132b, ink-muted #514d6b and ink-subtle
+ * #625e7c ≥ 4.5:1; accent text #4b3bdb 6.6:1; on the night band, night-text #c9c5e0 ≥ 10:1.
+ * Text on lime is always ink.
  */
 @theme {
   /* Surfaces */
-  --color-desk: #fbfbf8;
-  --color-chrome: #ffffff;
-  --color-chrome-hover: #f4f6f8;
-  --color-chrome-press: #eef2f4;
-  --color-paper: #fffffd;
-  --color-rule: #dbe5ee;
-  --color-line: #e2e8f0;
-  --color-line-strong: #cbd5e1;
+  --color-desk: #f3f2fb; /* page background behind everything */
+  --color-chrome: #ffffff; /* cards, panels, header */
+  --color-chrome-hover: #f8f7fd;
+  --color-chrome-press: #eceafe;
+  --color-paper: #fffefb; /* the notebook page */
+  --color-rule: #dce3f2; /* ruled lines on paper */
+  --color-margin: #f5b8d4; /* the notebook's pink margin line */
+  --color-line: #e4e2f0; /* hairline borders */
+  --color-line-strong: #c9c5e0;
 
-  /* Ink */
-  --color-ink: #0f172a;
-  --color-ink-muted: #475569;
-  --color-ink-subtle: #526176;
+  /* Ink (text) */
+  --color-ink: #16132b;
+  --color-ink-muted: #514d6b;
+  --color-ink-subtle: #625e7c;
+  --color-pen: #1d1a3a; /* handwriting on the page */
 
-  /* Primary action — teal */
-  --color-accent: #0d9488;
-  --color-accent-hover: #0f766e;
-  --color-accent-press: #115e59;
-  --color-accent-strong: #0f766e;
-  --color-accent-soft: #e7f7f4;
+  /* Dark bands */
+  --color-night: #16132b;
+  --color-night-raised: #1d1a3a;
+  --color-night-line: #34305a;
+  --color-night-text: #c9c5e0;
+
+  /* Primary action / links — ink indigo (text-safe: 6.6:1 on white) */
+  --color-accent: #4b3bdb;
+  --color-accent-hover: #3a2cb8;
+  --color-accent-press: #3a2cb8;
+  --color-accent-strong: #3a2cb8;
+  --color-accent-soft: #eceafe;
+  --color-accent-tint: #faf9ff;
+  --color-accent-line: #b9b2f5;
+  --color-accent-light: #8b80f9;
   --color-on-accent: #ffffff;
 
-  /* Ghost ink — teal, dashed, lighter than ink */
-  --color-ghost: #14b8a6;
-  --color-ghost-strong: #0f766e;
-  --color-ghost-soft: #effaf8;
+  /* Lime highlighter — "what matters" (background only; text on it stays ink) */
+  --color-highlight: #d9f99d;
+  --color-highlight-strong: #c2ea7a;
+  --color-on-highlight: #16132b;
 
-  /* Learning-timeline moments */
-  --color-corrected: #0891b2;
-  --color-corrected-strong: #155e75;
-  --color-corrected-soft: #ecfeff;
-  --color-gap: #b45309;
-  --color-gap-soft: #fff7ed;
+  /* Ghost ink — your own ink, faded to a light-indigo outline */
+  --color-ghost: #8b80f9;
+  --color-ghost-strong: #4b3bdb; /* text-safe */
+  --color-ghost-soft: #eceafe;
+
+  /* Status */
+  --color-ok: #046c4e;
+  --color-ok-strong: #046c4e;
+  --color-ok-soft: #e3f7ee;
+  --color-danger: #b42318;
+
+  /* Learning-trail moments (marker fill / text-safe / soft tint):
+     Fixed = green filled dot, Still fuzzy = orange open ring, Aha moment = pink diamond. */
+  --color-corrected: #0e9f6e;
+  --color-corrected-strong: #046c4e;
+  --color-corrected-soft: #e3f7ee;
+  --color-gap: #f08c00;
+  --color-gap-strong: #8a4500;
+  --color-gap-soft: #fff1dc;
+  --color-breakthrough: #e0338a;
+  --color-breakthrough-strong: #a3175e;
+  --color-breakthrough-soft: #fde8f2;
 
   /* Type */
-  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
-  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
-  --font-display: var(--font-instrument-serif), ui-serif, Georgia, serif;
+  --font-sans: var(--font-figtree), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains-mono), ui-monospace, monospace;
+  --font-display: var(--font-bricolage), ui-sans-serif, system-ui, sans-serif;
+  --font-hand: var(--font-caveat), "Comic Sans MS", cursive;
 
-  --shadow-page: 0 1px 2px rgb(15 23 42 / 0.04), 0 18px 48px -20px rgb(15 23 42 / 0.18);
-  --shadow-card: 0 1px 2px rgb(15 23 42 / 0.04), 0 8px 24px -14px rgb(15 23 42 / 0.14);
-  --shadow-lift: 0 2px 4px rgb(15 23 42 / 0.05), 0 24px 56px -24px rgb(13 148 136 / 0.35);
+  /* Radii */
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 22px;
+  --radius-pill: 999px;
 
+  /* Elevation — hairline borders separate, soft indigo shadows lift */
+  --shadow-hairline: 0 1px 0 rgb(22 19 43 / 0.04), 0 8px 24px -16px rgb(58 44 184 / 0.25);
+  --shadow-raised: 0 1px 0 rgb(22 19 43 / 0.05), 0 4px 12px -6px rgb(58 44 184 / 0.2);
+  --shadow-page: 0 1px 0 rgb(22 19 43 / 0.05), 0 30px 60px -30px rgb(40 30 120 / 0.35);
+  --shadow-card: 0 1px 0 rgb(22 19 43 / 0.04), 0 18px 40px -24px rgb(58 44 184 / 0.35);
+  --shadow-lift: 0 1px 0 rgb(22 19 43 / 0.04), 0 24px 48px -22px rgb(58 44 184 / 0.45);
+  --shadow-primary: inset 0 1px 0 rgb(255 255 255 / 0.25), 0 10px 24px -10px rgb(75 59 219 / 0.7);
+  --shadow-float: 0 18px 40px -18px rgb(22 19 43 / 0.35);
+
+  /* Motion */
   --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
-
-  --animate-marquee: marquee 38s linear infinite;
-  @keyframes marquee {
-    from {
-      transform: translate3d(0, 0, 0);
-    }
-    to {
-      transform: translate3d(-50%, 0, 0);
-    }
-  }
 }
 
 :root {
-  --nav-h: 72px;
-  --focus-ring: 0 0 0 2px #fff, 0 0 0 4px var(--color-accent);
+  --nav-h: 78px; /* sticky header height */
+  --tap: 44px; /* minimum touch target */
+  --focus-ring: 0 0 0 3px #fff, 0 0 0 6px var(--color-accent);
   color-scheme: light;
 }
 
 html {
   scroll-behavior: smooth;
-  /* Anchored sections land below the fixed header. */
+  /* Anchored sections land below the sticky header. */
   scroll-padding-top: calc(var(--nav-h) + 8px);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   -webkit-text-size-adjust: 100%;
-  background: var(--color-desk);
+  background-color: var(--color-desk);
 }
 
-/* Transparent so the fixed page background (z-index -1) shows through; html paints the paper. */
 body {
   background: transparent;
   color: var(--color-ink);
   font-family: var(--font-sans);
+  -webkit-tap-highlight-color: transparent;
   overflow-x: clip;
 }
 
-/* Tailwind v4 resets buttons to the default cursor: everything clickable shows the hand, and a
-   quick press gives tactile feedback. */
-:where(a[href], button:not(:disabled), summary, label[for], [role="button"], [role="radio"], [role="tab"]) {
-  cursor: pointer;
-}
-:where(button:not(:disabled), [role="button"], [role="radio"], [role="tab"], a.btn-primary, a.btn-secondary) {
-  -webkit-tap-highlight-color: transparent;
-  transition-property: color, background-color, border-color, box-shadow, opacity, transform;
-  transition-duration: 160ms;
-  transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
-}
-:where(button:not(:disabled), [role="button"], [role="radio"], [role="tab"], a.btn-primary, a.btn-secondary):active {
-  transform: scale(0.97);
+/* Headings use the display face unless a component says otherwise. */
+/* In the base layer so any font-* / tracking-* utility on a heading still wins. */
+@layer base {
+  :where(h1, h2, h3) {
+    font-family: var(--font-display);
+    letter-spacing: -0.02em;
+  }
 }
 
-:where(a, button, summary, video, input, [tabindex]):focus-visible {
-  outline: none;
-  box-shadow: var(--focus-ring);
+/* Tailwind v4 resets buttons to the default cursor: everything clickable shows the hand… */
+:where(a[href], button:not(:disabled), summary, label[for], [role="button"], [role="radio"], [role="tab"], [role="switch"]) {
+  cursor: pointer;
+}
+:where(button:disabled) {
+  cursor: not-allowed;
+}
+/* …and a quick press gives tactile feedback. */
+:where(button:not(:disabled), [role="button"], [role="radio"], [role="switch"], a.btn) {
+  -webkit-tap-highlight-color: transparent;
+  transition-property: color, background-color, border-color, box-shadow, opacity, transform, translate;
+  transition-duration: 160ms;
+  transition-timing-function: var(--ease-out-soft);
+}
+:where(button:not(:disabled), [role="button"], [role="radio"], [role="switch"], a.btn):active {
+  transform: translateY(1px);
+}
+
+/* One consistent, visible focus ring for keyboard users. */
+@layer base {
+  :where(a, button, input, select, textarea, summary, video, [tabindex]):focus-visible {
+    outline: 3px solid var(--color-accent);
+    outline-offset: 3px;
+  }
+  /* On the night band and the indigo CTA card the ring turns lime so it stays visible. */
+  :where(.on-dark) :where(a, button):focus-visible {
+    outline-color: var(--color-highlight);
+  }
 }
 
 ::selection {
-  background: rgb(45 212 191 / 0.3);
+  background: var(--color-highlight);
   color: var(--color-ink);
 }
 
-img,
 video {
-  outline: 1px solid rgb(15 23 42 / 0.08);
+  outline: 1px solid rgb(22 19 43 / 0.08);
   outline-offset: -1px;
 }
 
-/* Content column. */
-.container-x {
-  width: 100%;
-  max-width: 1200px;
-  margin-inline: auto;
-  padding-inline: 1rem;
-}
-@media (min-width: 640px) {
-  .container-x {
-    padding-inline: 2rem;
-  }
-}
-
-/* Section rhythm: one vertical spacing scale for every section. */
-.section-y {
-  padding-block: 5rem;
-}
-@media (min-width: 640px) {
-  .section-y {
-    padding-block: 7rem;
-  }
-}
-
 @layer components {
-  /*
-   * Translucent white panel: hairline border + soft shadow, frosted on larger screens (the blur
-   * re-samples the animated background every frame, so phones get a slightly more opaque panel
-   * without it).
-   */
-  .card,
-  .panel {
-    border: 1px solid rgb(226 232 240 / 0.9);
-    background: rgb(255 255 255 / 0.9);
-    border-radius: 1.25rem;
-    box-shadow: var(--shadow-card);
+  /* Layered (not bare) so Tailwind utilities at the call site can still override them. */
+
+  /* Content column (the artboard's 1240px page with a fluid 16–40px gutter). */
+  .container-x {
+    width: 100%;
+    max-width: 1240px;
+    margin-inline: auto;
+    padding-inline: clamp(16px, 4vw, 40px);
   }
-  @media (min-width: 768px) {
-    .card,
-    .panel {
-      background: rgb(255 255 255 / 0.78);
-      -webkit-backdrop-filter: blur(12px) saturate(1.1);
-      backdrop-filter: blur(12px) saturate(1.1);
+
+  /* Section rhythm: one vertical spacing scale for every section. */
+  .section-y {
+    padding-block: 4.5rem;
+  }
+  @media (min-width: 640px) {
+    .section-y {
+      padding-block: 5.5rem;
     }
   }
 
-  /* The handwriting card's page. */
-  .paper {
-    background-color: var(--color-paper);
+  /* White card: hairline border + soft indigo shadow. */
+  .card,
+  .panel {
+    border: 1px solid var(--color-line);
+    background: #fff;
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-card);
   }
 
-  /* Lined notebook page for the Try-it canvas: ruled lines + a teal margin rule. */
+  /* Small pill label: white pill, lime pen dot, indigo text. */
+  .eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    align-self: flex-start;
+    padding: 0.3rem 0.85rem 0.3rem 0.4rem;
+    border-radius: 999px;
+    border: 1px solid var(--color-line);
+    background: #fff;
+    font-size: 0.8125rem;
+    line-height: 1.2;
+    font-weight: 700;
+    color: var(--color-accent-strong);
+    white-space: nowrap;
+  }
+  .eyebrow::before {
+    content: "";
+    width: 1.1rem;
+    height: 1.1rem;
+    flex-shrink: 0;
+    border-radius: 999px;
+    background: var(--color-highlight);
+  }
+
+  /* Uppercase section label: "THE IDEA", "FOR EDUCATORS". */
+  .kicker {
+    font-size: 0.8125rem;
+    line-height: 1.2;
+    font-weight: 800;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--color-accent-strong);
+  }
+
+  /* Big section headings: Bricolage 800, tight. */
+  .section-title {
+    font-family: var(--font-display);
+    font-weight: 800;
+    font-size: clamp(2.125rem, 4.4vw, 3.5rem);
+    line-height: 1.02;
+    letter-spacing: -0.035em;
+    text-wrap: balance;
+  }
+
+  /* Handwritten margin note (Caveat, indigo). */
+  .hand-note {
+    font-family: var(--font-hand);
+    font-weight: 600;
+    color: #5446d8;
+    line-height: 1.05;
+  }
+
+  /* Lime highlighter swipe behind a word (static; components/motion/Highlight is the animated one). */
+  .hl {
+    background: var(--color-highlight);
+    color: var(--color-on-highlight);
+    border-radius: 8px 18px 10px 20px;
+    padding: 0 0.18em;
+    box-decoration-break: clone;
+    -webkit-box-decoration-break: clone;
+  }
+
+  /* Notebook page: warm paper, faint blue rules, a pink margin line. --nb-rule sets the rule gap
+     (and the line-height of handwriting set on it). */
+  .notebook {
+    --nb-rule: 34px;
+    background-color: var(--color-paper);
+    background-image: repeating-linear-gradient(
+      to bottom,
+      transparent 0,
+      transparent calc(var(--nb-rule) - 1px),
+      var(--color-rule) calc(var(--nb-rule) - 1px),
+      var(--color-rule) var(--nb-rule)
+    );
+    background-position: 0 18px;
+  }
+  @media (min-width: 640px) {
+    .notebook {
+      --nb-rule: 42px;
+    }
+  }
+
+  /* Lined notebook page for the Try-it canvas: ruled lines + the pink margin rule. */
   .tryit-paper {
     background-color: var(--color-paper);
     background-image:
-      linear-gradient(to right, transparent 55px, rgb(20 184 166 / 0.35) 55px 56px, transparent 56px),
+      linear-gradient(to right, transparent 55px, var(--color-margin) 55px 57px, transparent 57px),
       repeating-linear-gradient(to bottom, transparent 0 35px, var(--color-rule) 35px 36px);
   }
-}
 
-/* Pill buttons. */
-.btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-  min-height: 48px;
-  padding-inline: 1.75rem;
-  border-radius: 9999px;
-  font-size: 0.9375rem;
-  font-weight: 500;
-  white-space: nowrap;
-  border: 1px solid transparent;
-  transition-property: background-color, color, border-color, box-shadow, transform;
-  transition-duration: 180ms;
-  transition-timing-function: var(--ease-out-soft);
-}
-.btn:active {
-  transform: scale(0.97);
-}
-.btn-primary {
-  background: var(--color-accent-strong);
-  color: var(--color-on-accent);
-  font-weight: 600;
-  box-shadow:
-    0 1px 0 rgb(255 255 255 / 0.2) inset,
-    0 10px 24px -10px rgb(13 148 136 / 0.7);
-}
-.btn-primary:hover {
-  background: var(--color-accent-press);
-  box-shadow:
-    0 1px 0 rgb(255 255 255 / 0.2) inset,
-    0 14px 30px -10px rgb(13 148 136 / 0.75);
-}
-.btn-secondary {
-  background: rgb(255 255 255 / 0.85);
-  color: var(--color-ink);
-  border-color: var(--color-line-strong);
-  box-shadow: 0 1px 2px rgb(15 23 42 / 0.05);
-}
-.btn-secondary:hover {
-  background: #fff;
-  border-color: var(--color-accent);
-  color: var(--color-accent-press);
-}
-
-/* Bold highlighted pill label above section titles. */
-.eyebrow {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.55rem;
-  padding: 0.4rem 0.95rem 0.4rem 0.75rem;
-  border-radius: 999px;
-  border: 1px solid rgb(94 234 212 / 0.7);
-  background: linear-gradient(100deg, rgb(204 251 241 / 0.95), rgb(240 253 250 / 0.9));
-  box-shadow: 0 1px 2px rgb(15 23 42 / 0.06), 0 4px 14px -6px rgb(13 148 136 / 0.35);
-  font-size: 0.95rem;
-  font-weight: 800;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: #134e4a;
-}
-.eyebrow::before {
-  content: "";
-  width: 0.5rem;
-  height: 0.5rem;
-  border-radius: 999px;
-  background: #0d9488;
-  box-shadow: 0 0 0 3px rgb(13 148 136 / 0.18);
-}
-@media (min-width: 640px) {
-  .eyebrow {
-    font-size: 1.05rem;
+  /* Buttons. Sizes (height, padding, radius, type size) are set where they're used; these carry the
+     look: hover lifts 2px, press sinks 1px. */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    min-height: 48px;
+    padding-inline: 1.25rem;
+    border-radius: var(--radius-md);
+    font-weight: 700;
+    white-space: nowrap;
+    border: 1.5px solid transparent;
+    transition-property: background-color, color, border-color, box-shadow, transform;
+    transition-duration: 160ms;
+    transition-timing-function: var(--ease-out-soft);
   }
-}
-
-/* Logo strip: pauses off screen / on hover (data-paused), and for reduced motion. */
-.marquee-track {
-  animation: var(--animate-marquee);
-}
-[data-paused="true"] .marquee-track,
-.marquee:hover .marquee-track {
-  animation-play-state: paused;
+  @media (hover: hover) {
+    .btn:hover {
+      transform: translateY(-2px);
+    }
+  }
+  .btn:active {
+    transform: translateY(1px);
+  }
+  /* Primary: solid ink indigo with an inner highlight and a soft indigo glow. */
+  .btn-primary {
+    background: var(--color-accent);
+    color: var(--color-on-accent);
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.25),
+      0 16px 32px -14px rgb(75 59 219 / 0.75);
+  }
+  .btn-primary:hover {
+    background: var(--color-accent-hover);
+  }
+  /* Dark: night ink (header "Launch TraceIt", "Open class insights"). */
+  .btn-dark {
+    background: var(--color-ink);
+    color: #fff;
+  }
+  .btn-dark:hover {
+    background: #2a2550;
+  }
+  /* Secondary: white with an ink outline. */
+  .btn-secondary {
+    background: #fff;
+    color: var(--color-ink);
+    border-color: var(--color-ink);
+  }
+  .btn-secondary:hover {
+    border-color: var(--color-accent);
+    color: var(--color-accent-strong);
+  }
+  /* Light: white on the indigo CTA card. */
+  .btn-light {
+    background: #fff;
+    color: var(--color-ink);
+    box-shadow: 0 18px 36px -16px rgb(22 19 43 / 0.6);
+  }
+  .btn-light:hover {
+    background: var(--color-accent-tint);
+  }
 }
 
 /* Typing dots in the assistant. */
@@ -294,16 +387,6 @@ video {
   animation-delay: 0.3s;
 }
 
-/* Gradient ink sweep for LiquidMetal's maskText (static under reduced motion). */
-@keyframes metal-sweep {
-  from {
-    background-position: 0% 50%;
-  }
-  to {
-    background-position: 100% 50%;
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;
@@ -315,10 +398,9 @@ video {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
   }
-  .btn:active {
-    transform: none;
-  }
-  .marquee-track {
-    animation: none;
+  .btn:hover,
+  .btn:active,
+  :where(button, [role="button"], [role="radio"], [role="switch"], a.btn):active {
+    transform: none !important;
   }
 }

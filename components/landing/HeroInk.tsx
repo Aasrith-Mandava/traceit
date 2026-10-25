@@ -1,8 +1,8 @@
 "use client";
 
-// Hero visual: a paper card where `d/dx sin(x²) = cos(x²)` is handwritten stroke by stroke, the
-// answer is erased — and kept as dashed teal ghost ink — then `= 2x cos(x²)` is written and
-// Inkling flags the moment: "Corrected · forgot the inner derivative".
+// "How it works" visual: a paper card where `d/dx sin(x²) = cos(x²)` is handwritten stroke by
+// stroke, the answer is erased — and kept as faded, dashed ghost ink — then `= 2x cos(x²)` is
+// written and TraceIt marks the moment: "Fixed · forgot the inner derivative".
 //
 // The server-rendered HTML is the final frame (readable without JS, and what reduced-motion users
 // get). With motion allowed, the card replays the story in a gentle loop while it's on screen,
@@ -32,7 +32,7 @@ const rewrite = layoutLine("= 2x cos(x²)", eqX, BASE_2, SIZE);
 const rules = Array.from({ length: 6 }, (_, i) => BASE_1 + (i - 2) * RULE_GAP).filter((y) => y > 0 && y < VIEW_H);
 
 const ARIA =
-  "Handwritten notes: d/dx sin(x²) = cos(x²). The answer is erased but kept as dashed teal ghost ink, then rewritten below as 2x cos(x²). Inkling flags the moment as corrected: forgot the inner derivative.";
+  "Handwritten notes: d/dx sin(x²) = cos(x²). The answer is erased but kept as faded ghost ink, then rewritten below as 2x cos(x²). TraceIt marks the moment Fixed: forgot the inner derivative.";
 
 const wait = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
@@ -141,12 +141,12 @@ export function HeroInk() {
   return (
     <figure
       ref={scope}
-      className="relative mx-auto w-full max-w-[760px] overflow-hidden rounded-2xl border border-line bg-chrome text-left shadow-page"
+      className="relative mx-auto w-full max-w-[760px] overflow-hidden rounded-lg border border-line bg-chrome text-left shadow-page"
     >
       {/* Card chrome: which lecture, which moment. */}
       <div className="flex items-center justify-between gap-3 border-b border-line px-3 py-1.5 sm:px-4">
         <p className="min-w-0 truncate text-[13px] text-ink-muted">
-          <span className="font-medium text-ink">Calculus I</span>
+          <span className="font-bold text-ink">Calculus I</span>
           <span aria-hidden="true"> · </span>The chain rule
           <span className="ml-2 font-mono text-[12px] text-ink-subtle">00:18</span>
         </p>
@@ -163,7 +163,7 @@ export function HeroInk() {
       </div>
 
       {/* The page. */}
-      <div className="paper relative">
+      <div className="relative bg-paper">
         <svg
           viewBox={`0 0 ${VIEW_W} ${VIEW_H}`}
           role="img"
@@ -177,7 +177,7 @@ export function HeroInk() {
             <line key={y} x1="0" x2={VIEW_W} y1={y} y2={y} stroke="var(--color-rule)" strokeWidth="1" />
           ))}
 
-          <g data-part="lhs" stroke="var(--color-ink)" strokeWidth="2.9">
+          <g data-part="lhs" stroke="var(--color-pen)" strokeWidth="2.9">
             {lhs.strokes.map((s, i) => (
               <path
                 key={i}
@@ -197,7 +197,7 @@ export function HeroInk() {
               <path key={i} d={s.d} />
             ))}
           </g>
-          <g data-part="attempt" data-attempt-ink="" stroke="var(--color-ink)" strokeWidth="2.9" style={{ opacity: 0 }}>
+          <g data-part="attempt" data-attempt-ink="" stroke="var(--color-pen)" strokeWidth="2.9" style={{ opacity: 0 }}>
             {attempt.strokes.map((s, i) => (
               <path
                 key={i}
@@ -211,7 +211,7 @@ export function HeroInk() {
             ))}
           </g>
 
-          <g data-part="rewrite" stroke="var(--color-ink)" strokeWidth="2.9">
+          <g data-part="rewrite" stroke="var(--color-pen)" strokeWidth="2.9">
             {rewrite.strokes.map((s, i) => (
               <path
                 key={i}
@@ -230,24 +230,24 @@ export function HeroInk() {
         <p
           data-ghost=""
           aria-hidden="true"
-          className="absolute top-2 right-2 inline-flex items-center gap-1.5 rounded-full border border-ghost/30 bg-ghost-soft/90 px-2 py-0.5 text-[11px] text-ghost-strong sm:top-3 sm:right-3 sm:text-xs"
+          className="absolute top-2 right-2 inline-flex items-center gap-1.5 rounded-pill border border-ghost/30 bg-ghost-soft/90 px-2 py-0.5 text-[11px] font-semibold text-ghost-strong sm:top-3 sm:right-3 sm:text-xs"
         >
           <svg width="14" height="4" viewBox="0 0 14 4" aria-hidden="true">
             <path d="M1 2h12" stroke="var(--color-ghost)" strokeWidth="2" strokeLinecap="round" strokeDasharray="3 3" />
           </svg>
-          erased · kept as ghost
+          erased · kept as a ghost
         </p>
       </div>
 
-      {/* What Inkling made of it: the moment, on the lecture's timeline. */}
+      {/* What TraceIt made of it: the moment, on the lecture's timeline. */}
       <figcaption className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2.5 border-t border-line px-3 py-3 sm:px-4">
         <span
           data-pop=""
-          className="inline-flex items-center gap-2 rounded-full border border-corrected/35 bg-corrected-soft px-2.5 py-1 text-[13px] text-corrected-strong"
+          className="inline-flex items-center gap-2 rounded-pill border border-corrected/35 bg-corrected-soft px-2.5 py-1 text-[13px] text-corrected-strong"
         >
           <span aria-hidden="true" className="size-2 rounded-full bg-corrected" />
           <span>
-            <span className="font-medium">Corrected</span> · forgot the inner derivative
+            <span className="font-bold">Fixed</span> · forgot the inner derivative
           </span>
         </span>
 
@@ -259,7 +259,7 @@ export function HeroInk() {
               className="absolute inset-y-0 left-0 w-[22%] border-r border-dashed border-line-strong"
               style={{
                 backgroundImage:
-                  "repeating-linear-gradient(-45deg, transparent 0 3px, rgb(15 23 42 / .1) 3px 4px)",
+                  "repeating-linear-gradient(-45deg, transparent 0 3px, rgb(22 19 43 / .1) 3px 4px)",
               }}
             />
             <span

@@ -8,13 +8,13 @@ test.use({ viewport: { width: 1180, height: 820 } });
 
 test("DEMO_MODE: Live lecture is shown but disabled, and the server refuses it", async ({ page, request }) => {
   await page.goto("/app");
-  await expect(page.getByTestId("live-lecture-note")).toHaveText("Live lecture is available when you run Inkling yourself.");
+  await expect(page.getByTestId("live-lecture-note")).toHaveText("Live capture needs a self-hosted copy of TraceIt.");
   await expect(page.getByTestId("live-start")).toBeDisabled();
   await expect(page.getByTestId("live-title")).toBeDisabled();
 
   const res = await request.post("/api/lectures/live", { data: { title: "Should not exist" } });
   expect(res.status()).toBe(403);
-  expect(await res.json()).toEqual({ error: "Live lecture is available when you run Inkling yourself." });
+  expect(await res.json()).toEqual({ error: "Live lecture is available when you run TraceIt yourself." });
   const cues = await request.post("/api/lectures/demo-chain-rule/cues", { data: { cues: [] } });
   expect(cues.status()).toBe(403);
   const audio = await request.post("/api/lectures/demo-chain-rule/recording?durationMs=1000", {
@@ -25,15 +25,12 @@ test("DEMO_MODE: Live lecture is shown but disabled, and the server refuses it",
 
   const { lectures } = (await (await request.get("/api/lectures")).json()) as { lectures: Array<{ title: string }> };
   expect(lectures.some((l) => l.title === "Should not exist")).toBe(false);
-
-  await page.goto("/about");
-  await expect(page.getByTestId("about-microphone")).toHaveAttribute("data-live", "false");
 });
 
 // Uploads and Whisper in DEMO_MODE: nothing a stranger sends is stored, and nothing spends AI
 // credits (GROQ_API_KEY may be set on the public host for the landing assistant alone).
 test("DEMO_MODE: lecture upload, Notability PDF import and auto-transcribe are disabled with a note", async ({ page, request }) => {
-  const note = (what: string) => `${what} is available when you run Inkling yourself.`;
+  const note = (what: string) => `${what} is available when you run TraceIt yourself.`;
 
   const upload = await request.post("/api/lectures", {
     multipart: { title: "Should not exist", media: { name: "x.wav", mimeType: "audio/wav", buffer: Buffer.from("RIFF0000WAVE") } },

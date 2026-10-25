@@ -10,10 +10,10 @@ import { useReadAloud } from "./useReadAloud";
 type Loaded = { key: string; recap: RecapPayload } | { key: string; error: string };
 
 /**
- * "Hear your recap": a ≤ 90-word spoken summary of the session (corrections, gaps, breakthroughs,
+ * "Listen to a summary": a ≤ 90-word spoken recap of the session (corrections, gaps, breakthroughs,
  * what to review next) in the student's language, built on the server (POST …/recap). A server
  * voice (ElevenLabs / OpenAI) reads it when one is configured, otherwise the browser does (with
- * lib/readAloud's watchdog); the transcript is shown with it. `version` changes whenever the
+ * lib/readAloud's watchdog); "Read the summary" shows its text. `version` changes whenever the
  * timeline does (analysis, check answers), so the recap never describes an older state.
  */
 export default function SessionRecap({ sessionId, serverVoice, version }: { sessionId: string; serverVoice?: boolean; version: string }) {
@@ -34,7 +34,7 @@ export default function SessionRecap({ sessionId, serverVoice, version }: { sess
       .then(async (res) => {
         const body = (await res.json().catch(() => ({}))) as Partial<RecapPayload> & { error?: string };
         if (!res.ok || typeof body.text !== "string") {
-          setLoaded({ key, error: body.error ?? "Couldn’t prepare your recap." });
+          setLoaded({ key, error: body.error ?? "Couldn’t put your summary together." });
           return;
         }
         setLoaded({ key, recap: body as RecapPayload });
@@ -64,8 +64,10 @@ export default function SessionRecap({ sessionId, serverVoice, version }: { sess
   const active = state === "speaking" || state === "loading";
 
   return (
-    <section data-testid="session-recap" aria-label="Session recap" className="flex flex-col gap-2">
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+    // Sits at the end of the session-summary row (right-aligned when there is room); the text opens
+    // underneath it.
+    <section data-testid="session-recap" aria-label="Spoken summary" className="flex min-w-0 flex-col gap-2 sm:ml-auto sm:items-end">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 sm:justify-end">
         <button
           type="button"
           data-testid="recap-play"
@@ -78,12 +80,12 @@ export default function SessionRecap({ sessionId, serverVoice, version }: { sess
             setShowText(true);
             start();
           }}
-          className={`press inline-flex min-h-11 items-center gap-2 rounded-pill border px-4 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-60 ${
-            active ? "border-accent bg-accent-soft text-accent-press" : "border-line-strong bg-chrome text-ink hover:bg-chrome-hover"
+          className={`press inline-flex min-h-11 items-center gap-2 rounded-pill px-4 text-[15px] font-bold text-on-accent disabled:cursor-not-allowed disabled:opacity-60 ${
+            active ? "bg-accent hover:bg-accent-hover" : "bg-night hover:bg-night-raised"
           }`}
         >
-          {active ? <StopIcon size={14} /> : <SpeakerIcon size={16} />}
-          {state === "loading" ? "Preparing audio…" : state === "speaking" ? "Stop recap" : "Hear your recap"}
+          {active ? <StopIcon size={14} /> : <SpeakerIcon size={18} />}
+          {state === "loading" ? "Preparing audio…" : state === "speaking" ? "Stop summary" : "Listen to a summary"}
         </button>
         {recap && !showText ? (
           <button
@@ -92,9 +94,9 @@ export default function SessionRecap({ sessionId, serverVoice, version }: { sess
             aria-expanded={false}
             aria-controls={textId}
             onClick={() => setShowText(true)}
-            className="inline-flex min-h-11 items-center rounded-pill px-2 text-sm font-medium text-ink-muted underline decoration-line-strong underline-offset-4 hover:text-ink"
+            className="inline-flex min-h-11 items-center rounded-sm px-1 text-[15px] font-bold text-ink underline decoration-accent-line decoration-2 underline-offset-4 hover:text-accent-strong hover:decoration-accent"
           >
-            Read transcript
+            Read the summary
           </button>
         ) : null}
         {voice ? (
@@ -114,7 +116,10 @@ export default function SessionRecap({ sessionId, serverVoice, version }: { sess
         ) : null}
       </div>
       {showText && recap ? (
-        <div aria-live="polite" className="enter-soft flex max-w-prose flex-col gap-1">
+        <div
+          aria-live="polite"
+          className="enter-soft flex max-w-prose flex-col gap-1 rounded-[14px] border border-line bg-chrome px-4 py-3 text-left"
+        >
           <p
             id={textId}
             data-testid="recap-text"
@@ -127,7 +132,7 @@ export default function SessionRecap({ sessionId, serverVoice, version }: { sess
           </p>
           {recap.languageFallback ? (
             <p data-testid="recap-language-note" className="text-xs text-ink-subtle">
-              {languageInfo(language).native} isn’t available for the recap right now — it’s in English.
+              {languageInfo(language).native} isn’t available for the summary right now — it’s in English.
             </p>
           ) : null}
         </div>

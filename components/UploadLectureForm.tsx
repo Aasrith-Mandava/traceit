@@ -70,7 +70,10 @@ type CaptionState =
   | { status: "ready"; file: File; cues: number }
   | { status: "error"; file: File; error: string };
 
-/** A file picker styled as a drop zone. The input stays in the tab order (visually hidden). */
+/**
+ * A file picker styled as a dashed-indigo drop zone (like the sidebar's "Upload a lecture"). The input
+ * stays in the tab order (visually hidden).
+ */
 function FileZone({
   label,
   hint,
@@ -105,24 +108,24 @@ function FileZone({
       }}
       onDragLeave={() => setOver(false)}
       onDrop={onDrop}
-      className={`group relative flex min-h-[4.5rem] cursor-pointer items-center gap-3.5 rounded-lg border border-dashed px-4 py-3.5 transition-[background-color,border-color,box-shadow] duration-150 focus-within:shadow-[var(--focus-ring)] ${
+      className={`group relative flex min-h-[5.25rem] cursor-pointer items-center gap-3.5 rounded-[18px] border-[1.5px] border-dashed px-4 py-4 transition-[background-color,border-color,box-shadow] duration-150 focus-within:shadow-[var(--focus-ring)] ${
         over
           ? "border-accent bg-accent-soft"
           : invalid
             ? "border-danger/50 bg-paper"
-            : "border-line-strong bg-white/70 hover:border-accent/60 hover:bg-white"
+            : "border-accent-line bg-accent-tint hover:border-accent hover:bg-accent-soft"
       }`}
     >
       <span
         aria-hidden="true"
-        className="inline-flex size-10 shrink-0 items-center justify-center rounded-md border border-teal-200 bg-accent-soft text-accent-press"
+        className="inline-flex size-11 shrink-0 items-center justify-center rounded-md bg-white text-accent shadow-raised"
       >
         {icon}
       </span>
       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
         {children ?? (
           <>
-            <span className="text-[15px] font-medium text-ink">{label}</span>
+            <span className="text-[15px] font-bold text-accent-strong">{label}</span>
             <span className="text-sm text-ink-subtle">{hint}</span>
           </>
         )}
@@ -147,18 +150,28 @@ function FileZone({
  * with a note, and the server refuses the upload anyway (403). `publicMaxMb` is set when the public
  * demo accepts visitor uploads (DEMO_MODE + PUBLIC_UPLOADS): the form is enabled with that cap and a
  * note that uploads are removed again.
+ *
+ * `classes` (teachers only): the classes they teach, offered in an "Add to" select (personal by
+ * default, or `defaultClassId`); a lecture added to a class is shared with its students.
  */
 export default function UploadLectureForm({
   aiConfigured,
   available = true,
   publicMaxMb,
+  classes,
+  defaultClassId,
 }: {
   aiConfigured: boolean;
   available?: boolean;
   publicMaxMb?: number;
+  classes?: Array<{ id: string; name: string }>;
+  defaultClassId?: string;
 }) {
   const router = useRouter();
   const [title, setTitle] = useState("");
+  const [classId, setClassId] = useState(
+    defaultClassId && classes?.some((c) => c.id === defaultClassId) ? defaultClassId : "",
+  );
   const [media, setMedia] = useState<MediaState>({ status: "empty" });
   const [captions, setCaptions] = useState<CaptionState>({ status: "empty" });
   const [progress, setProgress] = useState<number | null>(null);
@@ -213,6 +226,7 @@ export default function UploadLectureForm({
     form.set("durationMs", String(media.durationMs));
     form.set("media", media.file);
     if (captions.status === "ready") form.set("captions", captions.file);
+    if (classId) form.set("classId", classId);
 
     // XHR (not fetch) for upload progress on large recordings.
     const xhr = new XMLHttpRequest();
@@ -244,7 +258,7 @@ export default function UploadLectureForm({
     const kind = media.status === "error" ? null : media.kind === "video" ? "Video" : "Audio";
     return (
       <>
-        <span className="truncate text-[15px] font-medium text-ink" title={f?.name}>
+        <span className="truncate text-[15px] font-semibold text-ink" title={f?.name}>
           {f?.name}
         </span>
         {media.status === "error" ? (
@@ -252,7 +266,7 @@ export default function UploadLectureForm({
             {media.error}
           </span>
         ) : (
-          <span data-testid="media-info" className="text-sm tabular-nums text-ink-subtle">
+          <span data-testid="media-info" className="font-mono text-[13px] tabular-nums text-ink-subtle">
             {kind} · {f ? formatBytes(f.size) : ""} ·{" "}
             {media.status === "reading" ? "reading length…" : formatClock(media.durationMs)}
           </span>
@@ -264,7 +278,7 @@ export default function UploadLectureForm({
   const captionSummary =
     captions.status === "empty" ? null : (
       <>
-        <span className="truncate text-[15px] font-medium text-ink" title={captions.file.name}>
+        <span className="truncate text-[15px] font-semibold text-ink" title={captions.file.name}>
           {captions.file.name}
         </span>
         {captions.status === "error" ? (
@@ -272,8 +286,8 @@ export default function UploadLectureForm({
             {captions.error}
           </span>
         ) : (
-          <span data-testid="captions-info" className="inline-flex items-center gap-1.5 text-sm text-ok">
-            <CheckIcon size={14} />
+          <span data-testid="captions-info" className="inline-flex items-center gap-1.5 text-sm font-semibold text-ok-strong">
+            <CheckIcon size={15} strokeWidth={2.4} />
             {captions.cues} {captions.cues === 1 ? "caption" : "captions"} · word timings ready
           </span>
         )}
@@ -284,19 +298,19 @@ export default function UploadLectureForm({
     <form
       onSubmit={submit}
       data-testid="upload-form"
-      className="panel flex flex-col gap-6 p-4 sm:p-6"
+      className="panel flex flex-col gap-6 p-5 sm:p-6"
       noValidate
       aria-describedby={available && publicMaxMb === undefined ? undefined : "upload-demo-note"}
     >
       {available && publicMaxMb === undefined ? null : (
-        <p id="upload-demo-note" data-testid="upload-demo-note" className="rounded-md bg-chrome px-3.5 py-2.5 text-sm text-pretty text-ink-muted">
+        <p id="upload-demo-note" data-testid="upload-demo-note" className="rounded-[14px] bg-desk px-4 py-3 text-sm text-pretty text-ink-muted">
           {available && publicMaxMb !== undefined ? publicUploadNote(publicMaxMb) : UPLOAD_DEMO_MESSAGE}
         </p>
       )}
       <fieldset disabled={!available} className="m-0 flex min-w-0 flex-col gap-6 border-0 p-0 disabled:opacity-60">
       <div className="flex flex-col gap-1.5">
-        <label htmlFor="lecture-title" className="text-sm font-medium text-ink">
-          Title
+        <label htmlFor="lecture-title" className="kicker tracking-[0.08em] text-ink-subtle">
+          Lecture title
         </label>
         <input
           id="lecture-title"
@@ -308,15 +322,40 @@ export default function UploadLectureForm({
             titleEdited.current = true;
             setTitle(e.target.value);
           }}
-          className="min-h-11 rounded-md border border-line-strong bg-white px-3.5 text-[15px] text-ink shadow-[0_1px_2px_rgb(15_23_42/0.04)] transition-colors placeholder:text-ink-subtle/80 hover:border-accent/60"
+          className="min-h-12 rounded-md border-[1.5px] border-line bg-chrome-hover px-3.5 text-base font-semibold text-ink transition-colors placeholder:font-normal placeholder:text-ink-subtle hover:border-accent-line"
         />
       </div>
 
+      {classes && classes.length > 0 ? (
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="lecture-class" className="kicker tracking-[0.08em] text-ink-subtle">
+            Add to
+          </label>
+          <select
+            id="lecture-class"
+            data-testid="upload-class-select"
+            value={classId}
+            onChange={(e) => setClassId(e.target.value)}
+            className="min-h-12 w-full rounded-md border-[1.5px] border-line bg-chrome-hover px-3.5 text-base font-semibold text-ink transition-colors hover:border-accent-line"
+          >
+            <option value="">Just me (personal)</option>
+            {classes.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+          <p className="text-sm text-pretty text-ink-subtle">
+            {classId ? "Everyone in this class can study it, and it shows up in your Class insights." : "Only you will see it."}
+          </p>
+        </div>
+      ) : null}
+
       <div className="flex flex-col gap-1.5">
-        <span className="text-sm font-medium text-ink">Recording</span>
+        <span className="kicker tracking-[0.08em] text-ink-subtle">Recording</span>
         <FileZone
-          label="Choose audio or video"
-          hint={`MP3, M4A, WAV, WebM or MP4 · up to ${publicMaxMb ?? 300} MB`}
+          label="Choose a recording"
+          hint={`or drop it here · MP3, M4A, WAV, WebM or MP4 · up to ${publicMaxMb ?? 300} MB`}
           accept={MEDIA_ACCEPT}
           testId="media-input"
           icon={<WaveIcon size={20} />}
@@ -328,12 +367,13 @@ export default function UploadLectureForm({
       </div>
 
       <div className="flex flex-col gap-1.5">
-        <span className="flex items-baseline gap-2 text-sm font-medium text-ink">
-          Captions <span className="font-normal text-ink-subtle">optional</span>
+        <span className="flex items-baseline gap-2">
+          <span className="kicker tracking-[0.08em] text-ink-subtle">Captions</span>
+          <span className="text-[13px] text-ink-subtle">optional</span>
         </span>
         <FileZone
           label="Choose a captions file"
-          hint="WebVTT (.vtt) or SubRip (.srt) · up to 2 MB"
+          hint="or drop it here · WebVTT (.vtt) or SubRip (.srt) · up to 2 MB"
           accept={CAPTIONS_ACCEPT}
           testId="captions-input"
           icon={<CaptionsIcon size={20} />}
@@ -342,12 +382,12 @@ export default function UploadLectureForm({
         >
           {captionSummary}
         </FileZone>
-        <p className="px-1 text-sm text-pretty text-ink-subtle">
-          Captions become the transcript you can follow while taking notes. Without them the lecture still works, but
+        <p className="text-sm text-pretty text-ink-subtle">
+          Captions become the words you follow along with while you write. Without them the lecture still plays, but
           moments won’t show what was said and pauses in your writing aren’t scored.
         </p>
         {!aiConfigured && available && publicMaxMb === undefined ? (
-          <p data-testid="upload-ai-note" className="px-1 text-xs text-ink-subtle">
+          <p data-testid="upload-ai-note" className="text-xs text-ink-subtle">
             Auto-transcribe needs an OpenAI or Groq key
           </p>
         ) : null}
@@ -355,7 +395,7 @@ export default function UploadLectureForm({
       </fieldset>
 
       {error ? (
-        <p role="alert" data-testid="upload-error" className="rounded-md bg-gap-soft px-3.5 py-2.5 text-sm text-gap-strong">
+        <p role="alert" data-testid="upload-error" className="rounded-[14px] bg-gap-soft px-4 py-3 text-sm text-gap-strong">
           {error}
         </p>
       ) : null}
@@ -363,13 +403,13 @@ export default function UploadLectureForm({
       <div className="flex flex-col-reverse items-stretch gap-3 border-t border-line pt-5 sm:flex-row sm:items-center sm:justify-end">
         {uploading ? (
           <div className="flex min-w-0 flex-1 items-center gap-3" role="status" aria-live="polite">
-            <div className="relative h-1 flex-1 overflow-hidden rounded-pill bg-line">
+            <div className="relative h-1.5 flex-1 overflow-hidden rounded-pill bg-accent-soft">
               <div
                 className="absolute inset-0 origin-left rounded-pill bg-accent transition-transform duration-150"
                 style={{ transform: `scaleX(${progress})` }}
               />
             </div>
-            <span className="w-10 text-right text-sm tabular-nums text-ink-subtle">
+            <span className="w-10 text-right font-mono text-[13px] tabular-nums text-ink-subtle">
               {Math.round((progress ?? 0) * 100)}%
             </span>
           </div>
@@ -378,7 +418,7 @@ export default function UploadLectureForm({
           Cancel
         </Link>
         <button type="submit" data-testid="upload-submit" disabled={!canSubmit} aria-busy={uploading} className={btnPrimary}>
-          {uploading ? "Uploading…" : "Add lecture"}
+          {uploading ? "Uploading…" : "Upload lecture"}
         </button>
       </div>
     </form>

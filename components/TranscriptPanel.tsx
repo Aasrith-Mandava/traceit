@@ -88,16 +88,16 @@ function NoTranscript({
 
   return (
     <div data-testid="transcript-empty" className="flex flex-col items-start gap-3 px-4 py-6">
-      <p className="font-medium text-ink">No transcript for this lecture</p>
-      <p className="text-sm text-pretty text-ink-muted">
-        Upload the lecture with captions (.vtt or .srt) to follow along here and see what was said at each moment.
+      <p className="font-display text-lg leading-tight font-bold text-ink">No captions for this lecture yet</p>
+      <p className="text-sm leading-relaxed text-pretty text-ink-muted">
+        Upload the lecture with a captions file (.vtt or .srt) to follow along here and see what was said at each moment.
       </p>
       {!transcribeAvailable ? (
         <div className="flex flex-col items-start gap-1.5">
           <button type="button" data-testid="transcribe" disabled aria-describedby="transcribe-demo-note" className={btnSecondary}>
             Auto-transcribe
           </button>
-          <p id="transcribe-demo-note" data-testid="transcribe-note" className="text-xs text-ink-subtle">
+          <p id="transcribe-demo-note" data-testid="transcribe-note" className="text-xs text-pretty text-ink-subtle">
             {TRANSCRIBE_DEMO_MESSAGE}
           </p>
         </div>
@@ -118,7 +118,7 @@ function NoTranscript({
         </button>
       )}
       {error ? (
-        <p role="alert" className="text-sm text-danger">
+        <p role="alert" className="text-sm font-medium text-danger">
           {error}
         </p>
       ) : null}
@@ -237,20 +237,20 @@ function TranscriptPanel({
   return (
     <aside
       id={id}
-      aria-label="Transcript"
+      aria-label="Captions"
       data-testid="transcript-panel"
-      className="enter-soft absolute inset-x-0 bottom-0 z-20 flex h-[46%] flex-col rounded-t-lg border-t border-line bg-chrome shadow-page lg:static lg:z-auto lg:h-auto lg:w-[21rem] lg:shrink-0 lg:rounded-none lg:border-t-0 lg:border-l lg:shadow-none"
+      className="enter-soft absolute inset-x-0 bottom-0 z-20 flex h-[46%] flex-col overflow-hidden rounded-t-lg border-t border-line bg-chrome shadow-page lg:static lg:z-auto lg:h-auto lg:w-[21rem] lg:shrink-0 lg:rounded-lg lg:border lg:shadow-card"
     >
-      <header className="flex min-h-12 shrink-0 items-center gap-2 border-b border-line pr-1 pl-4">
-        <h2 className="text-sm font-bold tracking-tight text-ink">Transcript</h2>
+      <header className="flex min-h-14 shrink-0 items-center gap-2.5 border-b border-line pr-1.5 pl-4">
+        <h2 className="text-base font-bold text-ink">Captions</h2>
         {SOURCE_LABEL[source] && words.length > 0 ? (
-          <span className="text-xs text-ink-subtle">{SOURCE_LABEL[source]}</span>
+          <span className="rounded-pill bg-desk px-2.5 py-0.5 text-xs font-semibold text-ink-muted">{SOURCE_LABEL[source]}</span>
         ) : null}
         <button
           type="button"
           data-testid="transcript-close"
           onClick={onClose}
-          aria-label="Close transcript"
+          aria-label="Close captions"
           className={`${iconBtn} ml-auto`}
         >
           <CloseIcon size={18} />
@@ -263,12 +263,12 @@ function TranscriptPanel({
           <div
             ref={scrollRef}
             tabIndex={0}
-            aria-label="Transcript text. Click a word to jump the lecture there."
+            aria-label="Captions. Click a word to jump the lecture there."
             onClick={onWordClick}
             onWheel={pauseFollow}
             onTouchMove={pauseFollow}
             onKeyDown={onKey}
-            className="transcript relative h-full overflow-y-auto overscroll-contain px-3 py-3 text-[15px] leading-7 text-ink-muted"
+            className="transcript relative h-full overflow-y-auto overscroll-contain px-4 py-3 text-[15px] leading-7 text-ink-muted"
           >
             <WordList words={words} />
           </div>
@@ -277,9 +277,9 @@ function TranscriptPanel({
               type="button"
               data-testid="transcript-follow"
               onClick={resumeFollow}
-              className="press enter-soft absolute bottom-3 left-1/2 inline-flex min-h-11 -translate-x-1/2 items-center rounded-pill bg-ink px-4 text-sm font-medium text-chrome shadow-page hover:bg-ink/90"
+              className="press enter-soft absolute bottom-3 left-1/2 inline-flex min-h-11 -translate-x-1/2 items-center rounded-pill bg-night px-4 text-sm font-bold text-white shadow-lift hover:bg-night-raised"
             >
-              Follow lecture
+              Follow along
             </button>
           ) : null}
         </div>

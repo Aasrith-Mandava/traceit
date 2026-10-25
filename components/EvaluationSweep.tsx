@@ -7,12 +7,13 @@ import { useId, useState, type KeyboardEvent } from "react";
 import type { SweepPoint } from "@/lib/evaluation";
 import { useWidth } from "./SignalChart";
 
-// Against the white chrome surface: both ≥ 4.5:1, opposite hues (teal vs amber) that stay apart
-// under protan/deutan simulation. Precision is the teal accent; recall is the amber of the gap
-// marker. Markers differ in shape too, so colour is never the only cue.
+// Against the white card: both ≥ 7:1, opposite hues (indigo vs burnt orange) that stay apart under
+// protan/deutan simulation. Precision is the ink-indigo accent (--color-accent); recall is the
+// text-safe orange of "Still fuzzy" (--color-gap-strong). Markers differ in shape too (circle vs
+// square), so colour is never the only cue.
 const SERIES = [
-  { key: "precision", label: "Precision", color: "#0f766e", shape: "circle" },
-  { key: "recall", label: "Recall", color: "#b45309", shape: "square" },
+  { key: "precision", label: "Precision", color: "#4b3bdb", shape: "circle" },
+  { key: "recall", label: "Recall", color: "#8a4500", shape: "square" },
 ] as const;
 
 const M = { top: 28, right: 28, bottom: 34, left: 44 };
@@ -123,9 +124,10 @@ export default function EvaluationSweep({ sweep, shipped }: { sweep: SweepPoint[
             </g>
           ))}
 
-          {/* The threshold the app ships with. */}
-          <line x1={x(shipped)} x2={x(shipped)} y1={M.top - 6} y2={M.top + PLOT_H} strokeWidth={1} className="stroke-ink/35" />
-          <text x={x(shipped)} y={M.top - 10} textAnchor="middle" className="fill-ink-muted text-[10.5px] font-medium">
+          {/* The threshold the app ships with: a lime highlighter column ("what matters") and a rule. */}
+          <rect x={x(shipped) - 9} y={M.top} width={18} height={PLOT_H} rx={4} className="fill-highlight/60" />
+          <line x1={x(shipped)} x2={x(shipped)} y1={M.top - 6} y2={M.top + PLOT_H} strokeWidth={1} strokeDasharray="4 3" className="stroke-ink/50" />
+          <text x={x(shipped)} y={M.top - 10} textAnchor="middle" className="fill-ink text-[10.5px] font-bold">
             shipped {shipped.toFixed(2)}
           </text>
 
@@ -147,14 +149,20 @@ export default function EvaluationSweep({ sweep, shipped }: { sweep: SweepPoint[
 
           {!labelsCollide
             ? lineLabels.map((l) => (
-                <text key={l.key} x={l.x} y={Math.max(12, l.y)} className="fill-ink-muted text-[11px] font-medium">
+                <text key={l.key} x={l.x} y={Math.max(12, l.y)} className="text-[11px] font-bold" fill={l.color}>
                   {l.label}
                 </text>
               ))
             : null}
 
           {sweep.map((p) => (
-            <text key={p.spikeScore} x={x(p.spikeScore)} y={M.top + PLOT_H + 16} textAnchor="middle" className="fill-ink-subtle font-mono text-[10px] tabular-nums">
+            <text
+              key={p.spikeScore}
+              x={x(p.spikeScore)}
+              y={M.top + PLOT_H + 16}
+              textAnchor="middle"
+              className={`font-mono text-[10px] tabular-nums ${p.spikeScore === shipped ? "fill-ink font-medium" : "fill-ink-subtle"}`}
+            >
               {p.spikeScore.toFixed(2)}
             </text>
           ))}
@@ -185,7 +193,7 @@ export default function EvaluationSweep({ sweep, shipped }: { sweep: SweepPoint[
           <div
             data-testid="sweep-tooltip"
             aria-hidden="true"
-            className="pointer-events-none absolute top-6 z-10 flex flex-col gap-1.5 rounded-md border border-line bg-chrome/95 px-3 py-2.5 text-xs shadow-page backdrop-blur-sm"
+            className="pointer-events-none absolute top-6 z-10 flex flex-col gap-1.5 rounded-[14px] border border-line bg-chrome px-3.5 py-3 text-xs shadow-lift"
             style={{ left: tipLeft, width: tipW }}
           >
             <span className="font-mono tabular-nums text-ink-muted">

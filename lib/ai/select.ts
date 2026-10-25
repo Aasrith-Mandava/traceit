@@ -7,7 +7,7 @@ import "server-only";
 //   AI_PROVIDER=openai|groq|gemini|grok → that provider (its key is required)
 //   otherwise           → auto: OPENAI_API_KEY, then GROQ_API_KEY, then GEMINI_API_KEY, then XAI_API_KEY
 // Groq (gsk_… keys) and xAI Grok (xai-… keys) are different companies: GROQ_API_KEY vs XAI_API_KEY.
-// INKLING_DISABLE_AI=1 turns every network provider off (tests set it; 'fake' still works).
+// TRACEIT_DISABLE_AI=1 turns every network provider off (tests set it; 'fake' still works).
 import { createCompatProvider, envKey, type CompatConfig, type Env } from './compat';
 import { createFakeProvider } from './fake';
 import { geminiConfig } from './gemini';
@@ -51,7 +51,7 @@ export function selectProvider(env: Env = process.env, deps: { fetch?: typeof fe
   if (truthy(env.DEMO_MODE)) return { mode: 'demo', provider: createFakeProvider(), reason: 'DEMO_MODE=1 (fixtures, offline)' };
   const wanted = envKey(env, 'AI_PROVIDER')?.toLowerCase() ?? null;
   if (wanted === 'fake') return { mode: 'fake', provider: createFakeProvider(), reason: 'AI_PROVIDER=fake' };
-  if (truthy(env.INKLING_DISABLE_AI)) return { mode: 'off', provider: null, reason: 'INKLING_DISABLE_AI=1' };
+  if (truthy(env.TRACEIT_DISABLE_AI ?? env.INKLING_DISABLE_AI)) return { mode: 'off', provider: null, reason: 'TRACEIT_DISABLE_AI=1' };
 
   const live = (name: NetworkProvider, cfg: CompatConfig): ProviderSelection => ({
     mode: 'live',

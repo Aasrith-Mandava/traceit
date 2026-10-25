@@ -1,5 +1,6 @@
-// Model evaluation tables: headline precision / recall / F1 for each detector, the TP/FP/FN
-// counts, and every label with what matched it (or why nothing did). Server component.
+// Accuracy check tables: headline precision / recall / F1 for each detector, the TP/FP/FN counts,
+// and every label with what matched it (or why nothing did). Server component. Outcome pills are
+// text-labelled (TP / FN / FP), so colour is never the only cue: TP green, FN red, FP orange.
 import type { ReactNode } from "react";
 import type { CaseResult, EvaluationReport, Metrics } from "@/lib/evaluation";
 import { MOMENT_META } from "@/lib/moments";
@@ -23,9 +24,13 @@ export const DETECTORS: Array<{ key: "spikes" | "moments"; title: string; blurb:
 
 function MetricTile({ label, value, testId }: { label: string; value: number | null; testId: string }) {
   return (
-    <div className="flex flex-col gap-0.5">
-      <dt className="text-xs text-ink-subtle">{label}</dt>
-      <dd data-testid={testId} data-value={value === null ? "" : value.toFixed(4)} className="text-2xl font-semibold text-ink">
+    <div className="flex flex-col gap-1 rounded-[14px] bg-chrome-hover px-3 py-2.5">
+      <dt className="text-[13px] font-bold text-ink-subtle">{label}</dt>
+      <dd
+        data-testid={testId}
+        data-value={value === null ? "" : value.toFixed(4)}
+        className="font-display text-[28px] leading-none font-extrabold tracking-[-0.02em] text-ink tabular-nums"
+      >
         {fmt(value)}
       </dd>
     </div>
@@ -34,7 +39,7 @@ function MetricTile({ label, value, testId }: { label: string; value: number | n
 
 export function DetectorCards({ report }: { report: EvaluationReport }) {
   return (
-    <div className="grid gap-3 sm:grid-cols-2">
+    <div className="grid gap-3.5 sm:grid-cols-2">
       {DETECTORS.map((d) => {
         const m: Metrics = report[d.key];
         return (
@@ -42,13 +47,13 @@ export function DetectorCards({ report }: { report: EvaluationReport }) {
             key={d.key}
             data-testid={`evaluation-detector-${d.key}`}
             aria-labelledby={`det-${d.key}`}
-            className="flex flex-col gap-3 panel px-4 py-4"
+            className="panel flex flex-col gap-4 px-5 py-5"
           >
-            <div className="flex flex-col gap-0.5">
-              <h4 id={`det-${d.key}`} className="text-sm font-semibold text-ink">
+            <div className="flex flex-col gap-1">
+              <h3 id={`det-${d.key}`} className="text-lg leading-tight font-bold text-ink">
                 {d.title}
-              </h4>
-              <p className="text-xs text-pretty text-ink-muted">{d.blurb}</p>
+              </h3>
+              <p className="text-sm text-pretty text-ink-muted">{d.blurb}</p>
             </div>
             <dl className="grid grid-cols-3 gap-2">
               <MetricTile label="Precision" value={m.precision} testId={`metric-${d.key}-precision`} />
@@ -64,30 +69,31 @@ export function DetectorCards({ report }: { report: EvaluationReport }) {
 
 export function ConfusionTable({ report }: { report: EvaluationReport }) {
   return (
-    <div className="overflow-x-auto panel">
+    // Focusable region so keyboard users can scroll the table sideways on narrow screens.
+    <div tabIndex={0} role="region" aria-label="Detections per detector" className="overflow-x-auto panel">
       <table data-testid="evaluation-confusion" className="w-full text-left text-sm">
         <caption className="sr-only">True positives, false positives and missed labels per detector</caption>
-        <thead className="border-b border-line text-xs text-ink-subtle">
+        <thead className="border-b border-line bg-chrome-hover text-xs text-ink-subtle">
           <tr>
-            <th scope="col" className="px-4 py-2 font-medium">
+            <th scope="col" className="px-4 py-2 font-bold">
               Detector
             </th>
-            <th scope="col" className="px-3 py-2 text-right font-medium">
+            <th scope="col" className="px-3 py-2 text-right font-bold">
               <abbr title="True positives: a flag within the tolerance of a label">TP</abbr>
             </th>
-            <th scope="col" className="px-3 py-2 text-right font-medium">
+            <th scope="col" className="px-3 py-2 text-right font-bold">
               <abbr title="False positives: a flag with no label nearby">FP</abbr>
             </th>
-            <th scope="col" className="px-3 py-2 text-right font-medium">
+            <th scope="col" className="px-3 py-2 text-right font-bold">
               <abbr title="False negatives: a label nothing flagged">FN</abbr>
             </th>
-            <th scope="col" className="px-3 py-2 text-right font-medium">
+            <th scope="col" className="px-3 py-2 text-right font-bold">
               Precision
             </th>
-            <th scope="col" className="px-3 py-2 text-right font-medium">
+            <th scope="col" className="px-3 py-2 text-right font-bold">
               Recall
             </th>
-            <th scope="col" className="px-4 py-2 text-right font-medium">
+            <th scope="col" className="px-4 py-2 text-right font-bold">
               F1
             </th>
           </tr>
@@ -97,7 +103,7 @@ export function ConfusionTable({ report }: { report: EvaluationReport }) {
             const m = report[d.key];
             return (
               <tr key={d.key} data-testid="confusion-row" data-detector={d.key}>
-                <th scope="row" className="px-4 py-2.5 font-sans font-medium text-ink">
+                <th scope="row" className="px-4 py-2.5 font-sans font-bold text-ink">
                   {d.title}
                 </th>
                 <td className="px-3 py-2.5 text-right text-ink" data-testid="confusion-tp">
@@ -127,10 +133,10 @@ function inBaseline(c: CaseResult, ms: number) {
 
 function Outcome({ kind, children }: { kind: "tp" | "fn" | "fp"; children: ReactNode }) {
   const cls =
-    kind === "tp" ? "bg-ok-soft text-ok-strong" : kind === "fn" ? "bg-corrected-soft text-corrected-strong" : "bg-gap-soft text-gap-strong";
+    kind === "tp" ? "bg-ok-soft text-ok-strong" : kind === "fn" ? "bg-danger/10 text-danger" : "bg-gap-soft text-gap-strong";
   return (
     <span className="inline-flex flex-wrap items-baseline gap-x-1.5">
-      <span className={`rounded-pill px-1.5 py-px font-sans text-[11px] font-semibold ${cls}`}>{kind.toUpperCase()}</span>
+      <span className={`rounded-pill px-2 py-px font-sans text-[11px] font-bold ${cls}`}>{kind.toUpperCase()}</span>
       <span className="text-ink-muted">{children}</span>
     </span>
   );
@@ -153,18 +159,18 @@ export function LabelTable({ report }: { report: EvaluationReport }) {
 
   return (
     <div className="flex flex-col gap-2">
-      <div className="overflow-x-auto panel">
+      <div tabIndex={0} role="region" aria-label="Every labeled moment" className="overflow-x-auto panel">
         <table data-testid="evaluation-labels" className="w-full min-w-[40rem] text-left text-sm">
           <caption className="sr-only">Each ground-truth label and the detection matched to it</caption>
-          <thead className="border-b border-line text-xs text-ink-subtle">
+          <thead className="border-b border-line bg-chrome-hover text-xs text-ink-subtle">
             <tr>
-              <th scope="col" className="px-4 py-2 font-medium">
+              <th scope="col" className="px-4 py-2 font-bold">
                 Label
               </th>
-              <th scope="col" className="px-3 py-2 font-medium">
+              <th scope="col" className="px-3 py-2 font-bold">
                 Hesitation spike
               </th>
-              <th scope="col" className="px-4 py-2 font-medium">
+              <th scope="col" className="px-4 py-2 font-bold">
                 Moment
               </th>
             </tr>

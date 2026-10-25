@@ -95,7 +95,7 @@ describe('chunkBatch', () => {
 describe('classifySaveFailure', () => {
   it('retries network errors, server errors, timeouts and rate limits', () => {
     expect(classifySaveFailure('network')).toBe('transient');
-    for (const status of [500, 502, 503, 504, 408, 429]) expect(classifySaveFailure(status)).toBe('transient');
+    for (const status of [500, 502, 503, 504, 401, 408, 429]) expect(classifySaveFailure(status)).toBe('transient');
   });
 
   it('does not retry the same payload after other client errors', () => {

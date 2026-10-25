@@ -1,6 +1,8 @@
 import { createReadStream } from "node:fs";
 import { stat } from "node:fs/promises";
 import { Readable } from "node:stream";
+import { notFoundJson, ownedSession } from "@/lib/access";
+import { withUser } from "@/lib/auth/core";
 import { getDb } from "@/lib/db";
 import { contentDisposition } from "@/lib/notability";
 import { resolvePdfPath } from "@/lib/storage";
@@ -10,8 +12,9 @@ import { resolvePdfPath } from "@/lib/storage";
  * the bytes are never interpreted as anything else. The compare page fetches it and renders it
  * with pdf.js; the ETag (the import id) lets a revisit skip the download.
  */
-export async function GET(request: Request, ctx: RouteContext<"/api/sessions/[id]/notability/file">) {
+export const GET = withUser(async (request, user, ctx: RouteContext<"/api/sessions/[id]/notability/file">) => {
   const { id } = await ctx.params;
+  if (!(await ownedSession(user, id))) return notFoundJson("session");
   const record = await getDb().getNotabilityImport(id);
   const abs = record ? resolvePdfPath(record.storedName) : null;
   if (!record || !abs) return Response.json({ error: "no Notability PDF for this session" }, { status: 404 });
@@ -38,4 +41,4 @@ export async function GET(request: Request, ctx: RouteContext<"/api/sessions/[id
   headers.set("Content-Length", String(size));
   const body = Readable.toWeb(createReadStream(abs)) as unknown as ReadableStream<Uint8Array>;
   return new Response(body, { status: 200, headers });
-}
+});

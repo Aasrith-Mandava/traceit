@@ -12,7 +12,7 @@ export const GET = sameOriginOnly(async () => {
     const info = await getDb().info();
     return Response.json({ ok: true, ...info }, { headers });
   } catch (err) {
-    console.error(`[inkling] health: database unavailable: ${err instanceof Error ? err.message : String(err)}`);
+    console.error(`[traceit] health: database unavailable: ${err instanceof Error ? err.message : String(err)}`);
     const backend = process.env.DATABASE_URL?.trim() ? "postgres" : "sqlite";
     return Response.json({ ok: false, backend, timescale: false }, { status: 503, headers });
   }

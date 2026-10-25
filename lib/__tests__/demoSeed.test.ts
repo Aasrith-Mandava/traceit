@@ -5,9 +5,9 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 // `npm run seed:demo` end to end, through getDb(): SQLite in the unit project, Postgres (PGlite) in
 // the postgres project. Runs the app's real analysis / gaps / grading over the demo scenario.
-const dir = mkdtempSync(join(tmpdir(), 'inkling-seed-'));
-process.env.INKLING_DB_PATH = join(dir, 'seed.db');
-process.env.INKLING_UPLOAD_DIR = join(dir, 'uploads');
+const dir = mkdtempSync(join(tmpdir(), 'traceit-seed-'));
+process.env.TRACEIT_DB_PATH = join(dir, 'seed.db');
+process.env.TRACEIT_UPLOAD_DIR = join(dir, 'uploads');
 
 let seed: typeof import('../demoSeed');
 let db: ReturnType<typeof import('../db')['getDb']>;
@@ -45,7 +45,7 @@ describe('seedDemo', () => {
     const gap = (await db.getAnalysis(DEMO_SESSIONS.s1.id))!.events.find((e) => e.type === 'unresolved_gap')!;
     expect(gap).toMatchObject({ resolvedBy: 'revisit', resolvedInSessionId: DEMO_SESSIONS.s2.id, conceptLabel: 'Chain versus product rule' });
 
-    const progress = await gaps.getProgress();
+    const progress = await gaps.getProgress('demo-student');
     const lecture = progress.lectures.find((l) => l.lectureId === 'demo-chain-rule')!;
     expect(lecture.threads).toHaveLength(1);
     expect(lecture.threads[0]).toMatchObject({ status: 'resolved', resolvedBy: 'revisit', label: 'Chain versus product rule' });
@@ -83,7 +83,7 @@ describe('seedDemo', () => {
   });
 
   it('is idempotent, and --reset rebuilds only the demo', async () => {
-    const other = await db.createSession({ lectureId: 'demo-chain-rule', courseId: 'calc1', title: 'my own notes' });
+    const other = await db.createSession({ studentId: 'demo-student', lectureId: 'demo-chain-rule', courseId: 'calc1', title: 'my own notes' });
     const again = await seed.seedDemo();
     expect(again.status).toBe('already-seeded');
     expect(again.sessions).toEqual(first.sessions);
@@ -95,5 +95,34 @@ describe('seedDemo', () => {
     expect(await db.getSession(other.id)).not.toBeNull();
     expect(existsSync(storage.resolvePdfPath(oldPdf)!)).toBe(false);
     expect(await db.listNotabilityImports(DEMO_SESSIONS.s1.id)).toHaveLength(1);
+  }, 60_000);
+
+  it('creates the demo accounts as guests, the demo class with everyone enrolled, and puts the lecture in it', async () => {
+    const { DEMO_CLASS_ID, DEMO_JOIN_CODE, DEMO_STUDENT_ID, DEMO_TEACHER_ID, DEMO_USERS } = await import('../demoAccounts');
+    const maya = (await db.getUser(DEMO_STUDENT_ID))!;
+    expect(maya).toMatchObject({ id: 'demo-student', name: 'Maya', role: 'student', guest: true });
+    expect(await db.getUser(DEMO_TEACHER_ID)).toMatchObject({ role: 'teacher', guest: true });
+    expect(await db.countAccounts()).toBe(0);
+    const cls = (await db.getClass(DEMO_CLASS_ID))!;
+    expect(cls).toMatchObject({ teacherId: DEMO_TEACHER_ID, joinCode: DEMO_JOIN_CODE });
+    const students = DEMO_USERS.filter((u) => u.role === 'student').map((u) => u.id);
+    expect(students).toHaveLength(DEMO_CLASSMATES + 1);
+    expect((await db.listClassStudentIds(DEMO_CLASS_ID)).sort()).toEqual([...students].sort());
+    expect((await db.getLecture('demo-chain-rule'))!.classId).toBe(DEMO_CLASS_ID);
+    // Maya's sessions stay hers; the classmates' are their own.
+    expect((await db.getSession(DEMO_SESSIONS.s1.id))!.studentId).toBe(DEMO_STUDENT_ID);
+    expect((await db.getSession(classmateSessionId(0)))!.studentId).not.toBe(DEMO_STUDENT_ID);
+  });
+
+  it('counts missing accounts or class membership as incomplete and restores them, idempotently', async () => {
+    const { DEMO_CLASS_ID } = await import('../demoAccounts');
+    expect((await seed.seedDemo()).status).toBe('already-seeded');
+    await db.setLectureClass('demo-chain-rule', null);
+    expect((await seed.seedDemo()).status).toBe('seeded');
+    expect((await db.getLecture('demo-chain-rule'))!.classId).toBe(DEMO_CLASS_ID);
+    expect((await seed.seedDemo()).status).toBe('already-seeded');
+    // A second seed never duplicates the guests or the class.
+    expect(await db.listTeacherClasses('demo-teacher')).toHaveLength(1);
+    expect(await db.listStudentClasses('demo-student')).toHaveLength(1);
   }, 60_000);
 });

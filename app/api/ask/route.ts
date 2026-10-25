@@ -1,6 +1,6 @@
-// POST /api/ask — the "Ask Inkling" assistant.
+// POST /api/ask — the "Ask TraceIt" assistant.
 //
-// Answers questions about Inkling, grounded in lib/knowledge.ts, with Groq (streamed plain text).
+// Answers questions about TraceIt, grounded in lib/knowledge.ts, with Groq (streamed plain text).
 // Without a key, when disabled, over quota, or when the model call fails, it answers from the
 // same knowledge base with a deterministic keyword matcher instead ("offline answer").
 //

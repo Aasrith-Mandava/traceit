@@ -6,9 +6,9 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 // The periodic DEMO_MODE reset (lib/demoReset) on SQLite, through getDb(): it restores the seeded
 // demo, prunes old visitor sessions, is atomic for concurrent readers and can't deadlock with an
 // analysis holding the shared (student, lecture) lock.
-const dir = mkdtempSync(join(tmpdir(), 'inkling-reset-'));
-process.env.INKLING_DB_PATH = join(dir, 'reset.db');
-process.env.INKLING_UPLOAD_DIR = join(dir, 'uploads');
+const dir = mkdtempSync(join(tmpdir(), 'traceit-reset-'));
+process.env.TRACEIT_DB_PATH = join(dir, 'reset.db');
+process.env.TRACEIT_UPLOAD_DIR = join(dir, 'uploads');
 
 let reset: typeof import('../demoReset');
 let seed: typeof import('../demoSeed');
@@ -19,6 +19,24 @@ const { DEMO_LECTURE } = await import('../demo');
 
 const NOW = new Date('2026-09-27T06:00:00Z');
 const HOUR = 3_600_000;
+const uploadAs = async (title: string, ownerId: string | null = null) => {
+  const { uploadTarget } = await import('../storage');
+  const { storedFileName } = await import('../upload');
+  const { abs, rel } = uploadTarget(storedFileName('.wav'));
+  writeFileSync(abs, 'RIFF....WAVE');
+  const lecture = await db.createLecture({
+    ownerId,
+    title,
+    courseId: 'general',
+    mediaPath: rel,
+    mediaType: 'audio',
+    mime: 'audio/wav',
+    durationMs: 2000,
+    words: [],
+    transcriptSource: 'none',
+  });
+  return { lecture, abs };
+};
 const within = <T>(p: Promise<T>, ms: number) =>
   Promise.race([p, new Promise<never>((_, reject) => setTimeout(() => reject(new Error(`timed out after ${ms} ms`)), ms))]);
 
@@ -62,8 +80,8 @@ describe('resetDemo', () => {
     await db.upsertStrokes(DEMO_SESSIONS.s1.id, [{ ...first, id: 'visitor-scribble' }]);
     expect((await db.getStrokes(DEMO_SESSIONS.s1.id)).length).toBe(seededStrokes + 1);
     const lecture = { lectureId: DEMO_LECTURE.lectureId, courseId: DEMO_LECTURE.courseId };
-    await db.createSession({ id: 'visitor-old', title: 'Old visit', createdAtIso: new Date(NOW.getTime() - 3 * HOUR).toISOString(), ...lecture });
-    await db.createSession({ id: 'visitor-new', title: 'New visit', createdAtIso: new Date(NOW.getTime() - 10 * 60_000).toISOString(), ...lecture });
+    await db.createSession({ id: 'visitor-old', studentId: 'demo-student', title: 'Old visit', createdAtIso: new Date(NOW.getTime() - 3 * HOUR).toISOString(), ...lecture });
+    await db.createSession({ id: 'visitor-new', studentId: 'demo-student', title: 'New visit', createdAtIso: new Date(NOW.getTime() - 10 * 60_000).toISOString(), ...lecture });
     await db.upsertStrokes('visitor-new', [{ ...first, id: 'visitor-new-stroke' }]);
 
     // Concurrently: an analysis of the visitor's session (same student + lecture lock as Maya's)
@@ -97,26 +115,11 @@ describe('resetDemo', () => {
   }, 60_000);
 
   it('removes old visitor-uploaded lectures, their sessions and files, but never the demo lecture', async () => {
-    const { uploadTarget } = await import('../storage');
-    const { storedFileName } = await import('../upload');
-    const addUpload = async (title: string) => {
-      const { abs, rel } = uploadTarget(storedFileName('.wav'));
-      writeFileSync(abs, 'RIFF....WAVE');
-      const lecture = await db.createLecture({
-        title,
-        courseId: 'general',
-        mediaPath: rel,
-        mediaType: 'audio',
-        mime: 'audio/wav',
-        durationMs: 2000,
-        words: [],
-        transcriptSource: 'none',
-      });
-      return { lecture, abs };
-    };
+    // Uploaded before accounts (no owner) and by the guest Maya: both are visitor uploads.
+    const addUpload = (title: string) => uploadAs(title, title.startsWith('Old') ? null : 'demo-student');
     const old = await addUpload('Old upload');
     // A session on the old upload, itself brand new: it goes with its lecture.
-    await db.createSession({ id: 'visitor-on-upload', title: 'Notes', lectureId: old.lecture.id, courseId: 'general' });
+    await db.createSession({ id: 'visitor-on-upload', studentId: 'demo-student', title: 'Notes', lectureId: old.lecture.id, courseId: 'general' });
 
     // Two hours later: the upload is older than the default 60 minutes.
     const later = new Date(Date.now() + 2 * HOUR);
@@ -139,5 +142,44 @@ describe('resetDemo', () => {
     expect(ids).toEqual(seed.allDemoSessionIds().sort());
     expect(await db.deleteLecture(DEMO_LECTURE.lectureId)).toEqual({ deleted: false, mediaPath: null });
     expect(await db.getLecture(DEMO_LECTURE.lectureId)).not.toBeNull();
+  }, 60_000);
+
+  it('never touches real accounts; prunes guest-teacher uploads and expired sign-ins', async () => {
+    const later = new Date(Date.now() + 3 * HOUR);
+    const longAgo = new Date(later.getTime() - 2 * HOUR).toISOString();
+    const real = (await db.createUser({ email: 'real@example.test', name: 'Real Teacher', role: 'teacher', passwordHash: 'scrypt$1$1$1$c2FsdA$aGFzaA' }))!;
+    const ownUpload = await uploadAs('Real upload', real.id);
+    await db.createSession({ id: 'real-on-demo', studentId: real.id, title: 'Mine', lectureId: DEMO_LECTURE.lectureId, courseId: DEMO_LECTURE.courseId, createdAtIso: longAgo });
+    await db.createSession({ id: 'real-on-own', studentId: real.id, title: 'Mine too', lectureId: ownUpload.lecture.id, courseId: 'general', createdAtIso: longAgo });
+    // An owner-less (pre-accounts) upload a real account has notes on: kept with every session on it.
+    const legacy = await uploadAs('Legacy upload');
+    await db.createSession({ id: 'real-on-legacy', studentId: real.id, title: 'Legacy notes', lectureId: legacy.lecture.id, courseId: 'general', createdAtIso: longAgo });
+    await db.createSession({ id: 'guest-on-legacy', studentId: 'demo-student', title: 'Guest notes', lectureId: legacy.lecture.id, courseId: 'general', createdAtIso: longAgo });
+    // The guest teacher's upload, with a guest session on it: removed.
+    const guestUpload = await uploadAs('Guest teacher upload', 'demo-teacher');
+    await db.createSession({ id: 'guest-on-guest', studentId: 'demo-student', title: 'Guest notes', lectureId: guestUpload.lecture.id, courseId: 'general', createdAtIso: longAgo });
+    // Sign-ins: one expired by `later`, one still valid.
+    await db.createAuthSession({ tokenHash: 'a'.repeat(64), userId: real.id, expiresAtIso: new Date(later.getTime() - HOUR).toISOString() });
+    await db.createAuthSession({ tokenHash: 'b'.repeat(64), userId: real.id, expiresAtIso: new Date(later.getTime() + 30 * 24 * HOUR).toISOString() });
+
+    const result = await reset.resetDemo({ DEMO_MODE: '1' }, later);
+    expect(result.lectures).toBe(1);
+    expect(result.signIns).toBe(1);
+    expect(result.pruned).toBe(1); // guest-on-legacy (its lecture is kept for the real account)
+    expect(await db.getLecture(guestUpload.lecture.id)).toBeNull();
+    expect(existsSync(guestUpload.abs)).toBe(false);
+    expect(await db.getSession('guest-on-guest')).toBeNull();
+    expect(await db.getSession('guest-on-legacy')).toBeNull();
+
+    expect(await db.getUser(real.id)).not.toBeNull();
+    expect(await db.getLecture(ownUpload.lecture.id)).not.toBeNull();
+    expect(existsSync(ownUpload.abs)).toBe(true);
+    expect(await db.getLecture(legacy.lecture.id)).not.toBeNull();
+    for (const id of ['real-on-demo', 'real-on-own', 'real-on-legacy']) expect(await db.getSession(id)).not.toBeNull();
+    expect(await db.getAuthSessionUser('a'.repeat(64), later.toISOString())).toBeNull();
+    expect((await db.getAuthSessionUser('b'.repeat(64), later.toISOString()))?.id).toBe(real.id);
+    // The demo itself is intact.
+    for (const id of seed.allDemoSessionIds()) expect(await db.getSession(id)).not.toBeNull();
+    expect(await db.getUser('demo-student')).toMatchObject({ guest: true });
   }, 60_000);
 });

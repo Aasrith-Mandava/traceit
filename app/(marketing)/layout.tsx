@@ -1,17 +1,6 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono, Instrument_Serif } from "next/font/google";
-import { PageBackground } from "@/components/landing/PageBackground";
+import { fontVariables } from "@/lib/fonts";
 import "./globals.css";
-
-// Fonts are downloaded at build time and self-hosted by next/font (no runtime font requests).
-const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
-const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
-const instrumentSerif = Instrument_Serif({
-  variable: "--font-instrument-serif",
-  weight: "400",
-  style: ["normal", "italic"],
-  subsets: ["latin"],
-});
 
 /**
  * Absolute base for og:image and friends. Set NEXT_PUBLIC_SITE_URL for a custom domain; on Vercel
@@ -28,29 +17,29 @@ function siteUrl(): URL {
   return new URL(`http://localhost:${process.env.PORT || 3000}`);
 }
 
-const title = "Inkling — Handwriting intelligence for learners";
+const title = "TraceIt — Study notes that learn from your mistakes";
 const description =
-  "Inkling keeps what you erase. It reads how you write during a lecture — the pauses, the erasing, the rewrites — and turns them into a learning timeline of mistakes you fixed, gaps you still have, and the lecture moment behind each one.";
+  "Your eraser is hiding the good stuff. TraceIt quietly watches how you write during a lecture — the pauses, the scratch-outs, the do-overs — and turns them into a trail of what you fixed, what still feels fuzzy, and the exact second of lecture behind each one.";
 
 export const metadata: Metadata = {
   metadataBase: siteUrl(),
   title,
   description,
-  applicationName: "Inkling",
+  applicationName: "TraceIt",
   keywords: ["note-taking", "handwriting", "lecture notes", "iPad", "Apple Pencil", "learning analytics", "Notability", "study tools"],
   alternates: { canonical: "/welcome" },
   openGraph: {
     type: "website",
-    siteName: "Inkling",
+    siteName: "TraceIt",
     title,
     description,
     url: "/welcome",
     images: [
       {
-        url: "/inkling-demo-poster.jpg",
+        url: "/traceit-demo-poster.jpg",
         width: 1280,
         height: 800,
-        alt: "Inkling's review screen: an erased answer kept as dashed ghost ink under the rewrite, flagged as a corrected misconception.",
+        alt: "TraceIt's study screen: an erased answer kept as a faded ghost under the rewrite, marked on the learning trail as a mistake you fixed.",
       },
     ],
   },
@@ -58,13 +47,13 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title,
     description,
-    images: ["/inkling-demo-poster.jpg"],
+    images: ["/traceit-demo-poster.jpg"],
   },
   icons: { icon: "/icon.svg" },
 };
 
 export const viewport: Viewport = {
-  themeColor: "#fbfbf8",
+  themeColor: "#f3f2fb",
   colorScheme: "light",
   width: "device-width",
   initialScale: 1,
@@ -73,22 +62,22 @@ export const viewport: Viewport = {
 const jsonLd = {
   "@context": "https://schema.org",
   "@type": "SoftwareApplication",
-  name: "Inkling",
+  name: "TraceIt",
   applicationCategory: "EducationalApplication",
   operatingSystem: "Web (designed for iPad and Apple Pencil)",
   description,
 };
 
-// Root layout of the marketing page (/welcome): its own stylesheet, fonts and the live pearl
-// background. The app (/app, /session, …) has a separate root layout in app/(product).
+// Root layout of the marketing page (/welcome): its own stylesheet and the shared Highlighter fonts
+// (lib/fonts) on a flat lavender desk. The app (/app, /session, …) has a separate root layout in
+// app/(product).
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} ${instrumentSerif.variable} antialiased`}
+      className={`${fontVariables} antialiased`}
     >
       <body className="min-h-dvh text-ink">
-        <PageBackground />
         {children}
         <script
           type="application/ld+json"

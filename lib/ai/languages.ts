@@ -33,7 +33,9 @@ export type LanguageCode = (typeof LANGUAGES)[number]['code'];
 export const DEFAULT_LANGUAGE: LanguageCode = 'en';
 
 /** localStorage key for the student's choice (a per-device convenience, not account data). */
-export const LANGUAGE_STORAGE_KEY = 'inkling.helpLanguage';
+export const LANGUAGE_STORAGE_KEY = 'traceit.helpLanguage';
+/** The same choice saved before the app was renamed (Inkling); still read so it isn't lost. */
+export const LEGACY_LANGUAGE_STORAGE_KEY = 'inkling.helpLanguage';
 
 const BY_CODE = new Map<string, Language>(LANGUAGES.map((l) => [l.code, l]));
 

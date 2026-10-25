@@ -1,9 +1,10 @@
 import { defineConfig, devices } from "@playwright/test";
+import { STATE } from "./e2e/accounts";
 
 const PORT = 3100;
 /** The production demo server (`npm run demo` on its own port and database). */
 const DEMO_PORT = 3101;
-const PG = process.env.INKLING_TEST_PG === "1";
+const PG = (process.env.TRACEIT_TEST_PG ?? process.env.INKLING_TEST_PG) === "1";
 
 /** No real AI or voices in tests, even if the developer has keys configured. */
 const NO_KEYS = {
@@ -31,24 +32,39 @@ export default defineConfig({
     launchOptions: { args: ["--autoplay-policy=no-user-gesture-required"] },
   },
   projects: [
+    // Signs in the e2e accounts once per run and saves their cookies (e2e/.auth/*.json, gitignored):
+    // a student (who owns the e2e server's data), a second student and a teacher on the e2e server,
+    // and the shared demo guests (Maya, the demo teacher) on the demo server. See e2e/auth.setup.ts.
+    { name: "setup", testMatch: /auth\.setup\.ts$/ },
     // Pre-Phase-5 specs run with AI switched off per request (test-only header, ignored in
     // production builds; see lib/ai/service aiDisabledByRequest), exactly as before AI existed.
+    // Signed in as the e2e student (page and `request` alike); specs that need someone else open a
+    // context with another state from e2e/accounts.
     {
       name: "chromium",
       testIgnore: /(phase5|impact|demo|landing)\.spec\.ts$/,
-      use: { ...devices["Desktop Chrome"], extraHTTPHeaders: { "x-inkling-ai": "off" } },
+      dependencies: ["setup"],
+      use: { ...devices["Desktop Chrome"], extraHTTPHeaders: { "x-traceit-ai": "off" }, storageState: STATE.student },
     },
     // Phase 5 (AI re-teach) and the multilingual re-teach / audio recap (impact) against the
     // deterministic fake provider.
-    { name: "ai", testMatch: /(phase5|impact)\.spec\.ts$/, use: { ...devices["Desktop Chrome"] } },
-    // Phase 8: the seeded demo, offline, against the production build (next start, DEMO_MODE=1).
+    {
+      name: "ai",
+      testMatch: /(phase5|impact)\.spec\.ts$/,
+      dependencies: ["setup"],
+      use: { ...devices["Desktop Chrome"], storageState: STATE.student },
+    },
+    // Phase 8: the seeded demo, offline, against the production build (next start, DEMO_MODE=1),
+    // signed in as the shared guest Maya ("Try the demo"); demo.spec also covers the signed-out path.
     {
       name: "demo",
       testMatch: /demo\.spec\.ts$/,
-      use: { ...devices["Desktop Chrome"], baseURL: `http://127.0.0.1:${DEMO_PORT}` },
+      dependencies: ["setup"],
+      use: { ...devices["Desktop Chrome"], baseURL: `http://127.0.0.1:${DEMO_PORT}`, storageState: STATE.demoStudent },
     },
-    // The marketing page (/welcome) and its Ask Inkling assistant, on the same production server.
+    // The marketing page (/welcome) and its Ask TraceIt assistant, on the same production server.
     // LANDING_AI_DISABLED=1 there: the assistant always answers from the offline FAQ matcher.
+    // Public: no sign-in.
     {
       name: "landing",
       testMatch: /landing\.spec\.ts$/,
@@ -58,26 +74,26 @@ export default defineConfig({
   webServer: [
     {
       // The e2e DB and uploads are wiped before the server starts so runs are repeatable.
-      // Its own build folder (INKLING_DIST_DIR), so it can run next to an everyday `next dev`.
+      // Its own build folder (TRACEIT_DIST_DIR), so it can run next to an everyday `next dev`.
       command: `node e2e/reset-db.mjs && npm run dev -- --port ${PORT}`,
       url: `http://localhost:${PORT}`,
       reuseExistingServer: !process.env.CI,
       timeout: 180_000,
       env: {
-        INKLING_DIST_DIR: ".next-e2e",
-        INKLING_DB_PATH: "data/e2e.db",
+        TRACEIT_DIST_DIR: ".next-e2e",
+        TRACEIT_DB_PATH: "data/e2e.db",
         // SQLite by default, never a DATABASE_URL from .env.local (an empty value blocks it).
-        // INKLING_TEST_PG=1 runs the whole suite on the Postgres repository (embedded PGlite).
+        // TRACEIT_TEST_PG=1 runs the whole suite on the Postgres repository (embedded PGlite).
         DATABASE_URL: PG ? "pglite:data/e2e-pg" : "",
         // Uploaded test lectures go to their own (gitignored) folder, removed before and after runs.
-        INKLING_UPLOAD_DIR: "data/e2e-uploads",
+        TRACEIT_UPLOAD_DIR: "data/e2e-uploads",
         // The deterministic fake provider serves AI requests (AI_PROVIDER=fake never touches the
         // network), network providers and voices are disabled, and Whisper stays off.
         AI_PROVIDER: "fake",
         ...NO_KEYS,
         DEMO_MODE: "",
-        INKLING_DISABLE_AI: "1",
-        INKLING_TTS_DIR: "data/e2e-tts",
+        TRACEIT_DISABLE_AI: "1",
+        TRACEIT_TTS_DIR: "data/e2e-tts",
       },
     },
     {
@@ -87,11 +103,11 @@ export default defineConfig({
       reuseExistingServer: !process.env.CI,
       timeout: 420_000,
       env: {
-        INKLING_DIST_DIR: ".next-e2e-demo",
-        INKLING_DB_PATH: "data/e2e-demo.db",
+        TRACEIT_DIST_DIR: ".next-e2e-demo",
+        TRACEIT_DB_PATH: "data/e2e-demo.db",
         DATABASE_URL: PG ? "pglite:data/e2e-demo-pg" : "",
-        INKLING_UPLOAD_DIR: "data/e2e-demo-uploads",
-        INKLING_TTS_DIR: "data/e2e-demo-tts",
+        TRACEIT_UPLOAD_DIR: "data/e2e-demo-uploads",
+        TRACEIT_TTS_DIR: "data/e2e-demo-tts",
         DEMO_MODE: "1",
         AI_PROVIDER: "",
         ...NO_KEYS,

@@ -1,7 +1,7 @@
 import "server-only";
 
-// Where lecture media lives on disk. Uploads go to INKLING_UPLOAD_DIR (default
-// <INKLING_DATA_DIR>/uploads, i.e. data/uploads, which is gitignored; see lib/paths); the demo lecture lives in public/demo. Paths stored in the DB are relative to the
+// Where lecture media lives on disk. Uploads go to TRACEIT_UPLOAD_DIR (default
+// <TRACEIT_DATA_DIR>/uploads, i.e. data/uploads, which is gitignored; see lib/paths); the demo lecture lives in public/demo. Paths stored in the DB are relative to the
 // project root and are always server-generated.
 import { mkdirSync } from "node:fs";
 import { basename, dirname, relative, resolve, sep } from "node:path";

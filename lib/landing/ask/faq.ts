@@ -17,7 +17,7 @@ const STOPWORDS = new Set(
 const KEEP_FOR_KEYWORDS = new Set(["know", "get", "one"]);
 
 /** Words that barely distinguish anything on this page. */
-const LOW_WEIGHT: Record<string, number> = { inkling: 0.25, app: 0.5, notes: 0.5, work: 0.25, works: 0.25, use: 0.5 };
+const LOW_WEIGHT: Record<string, number> = { traceit: 0.25, app: 0.5, notes: 0.5, work: 0.25, works: 0.25, use: 0.5 };
 
 export function tokenize(text: string): string[] {
   return text
@@ -85,17 +85,17 @@ export const MIN_FAQ_SCORE = 1.5;
 const GREETING = /^(hi|hello|hey|yo|hiya|good (morning|afternoon|evening)|thanks|thank you|thx)\b[\s!.?]*$/i;
 
 export const OFFLINE_NO_MATCH =
-  "I don't know that one. I can tell you how Inkling notices when you're stuck, what ghost ink is, which languages it speaks, how it works with Notability, how your data is handled, what teachers see, and how to try it.";
+  "I don't know that one. I can tell you how TraceIt notices when you're stuck, what ghost ink is, which languages it speaks, how it works with Notability, how your data is handled, what teachers see, and how to try it.";
 
 export const OFFLINE_GREETING =
-  "Hi! I'm Inkling's assistant. Ask me how Inkling notices when you're stuck, how it works with Notability, how your data is handled, or which languages it supports.";
+  "Hi! I'm TraceIt's assistant. Ask me how TraceIt notices when you're stuck, how it works with Notability, how your data is handled, or which languages it supports.";
 
 /** A deterministic answer for any question. */
 export function offlineAnswer(query: string): { text: string; entryId: string | null } {
   if (GREETING.test(query.trim())) return { text: OFFLINE_GREETING, entryId: null };
-  // "What is Inkling?" / "Tell me about Inkling": nothing but the name left after stopwords.
+  // "What is TraceIt?" / "Tell me about TraceIt": nothing but the name left after stopwords.
   const content = tokenize(query).filter((w) => !STOPWORDS.has(w));
-  if (content.length && content.every((w) => w === "inkling" || w === "about")) {
+  if (content.length && content.every((w) => w === "traceit" || w === "about")) {
     const what = KNOWLEDGE.find((e) => e.id === "what")!;
     return { text: what.answer, entryId: what.id };
   }
